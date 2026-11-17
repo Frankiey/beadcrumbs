@@ -280,7 +280,7 @@ The suites cover competing claims across processes, stale tokens, simultaneous i
 | Priorities, labels, epics | ❌ (priority planned) | ✅ | ✅ | ❌ |
 | Multi-machine sync | ❌ (out of scope for v1) | ✅ (Dolt remotes) | ✅ | ⚠️ via Git |
 
-Beadcrumbs grew out of a [feature review of Beads](docs/research/beads-feature-extraction.md). The Beads column reflects commit `53cc7d8` (November 2026). It trades Beads' richer feature set for the smallest possible deployment footprint and a plain-file protocol that any language can implement.
+Beadcrumbs grew out of a [feature review of Beads](docs/research/beads-feature-extraction.md). The Beads column reflects commit `d76ade2` (November 2026). It trades Beads' richer feature set for the smallest possible deployment footprint and a plain-file protocol that any language can implement.
 
 ## 📚 Documentation
 
