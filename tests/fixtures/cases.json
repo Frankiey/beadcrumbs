@@ -1,0 +1,227 @@
+[
+  {
+    "name": "empty",
+    "issues": [],
+    "commands": [
+      {
+        "args": [
+          "--list"
+        ],
+        "code": 0,
+        "result": []
+      },
+      {
+        "args": [
+          "--validate"
+        ],
+        "code": 0,
+        "result": {
+          "valid": true,
+          "issue_count": 0
+        }
+      }
+    ]
+  },
+  {
+    "name": "dependency-chain",
+    "issues": [
+      {
+        "id": "bc-00000000000040008000000000000002",
+        "title": "Dependent",
+        "description": "",
+        "acceptance_criteria": "",
+        "state": "open",
+        "depends_on": [
+          "bc-00000000000040008000000000000001"
+        ],
+        "claim": null,
+        "notes": [],
+        "created_at": "2026-11-14T00:00:00Z",
+        "updated_at": "2026-11-14T00:00:00Z",
+        "revision": 1
+      },
+      {
+        "id": "bc-00000000000040008000000000000001",
+        "title": "Prerequisite",
+        "description": "",
+        "acceptance_criteria": "",
+        "state": "open",
+        "depends_on": [],
+        "claim": null,
+        "notes": [],
+        "created_at": "2026-11-14T00:00:00Z",
+        "updated_at": "2026-11-14T00:00:00Z",
+        "revision": 1
+      }
+    ],
+    "commands": [
+      {
+        "args": [
+          "--ready"
+        ],
+        "code": 0,
+        "result": [
+          {
+            "id": "bc-00000000000040008000000000000001",
+            "title": "Prerequisite",
+            "description": "",
+            "acceptance_criteria": "",
+            "state": "open",
+            "depends_on": [],
+            "claim": null,
+            "notes": [],
+            "created_at": "2026-11-14T00:00:00Z",
+            "updated_at": "2026-11-14T00:00:00Z",
+            "revision": 1
+          }
+        ]
+      },
+      {
+        "args": [
+          "--blocked"
+        ],
+        "code": 0,
+        "result": [
+          {
+            "issue": {
+              "id": "bc-00000000000040008000000000000002",
+              "title": "Dependent",
+              "description": "",
+              "acceptance_criteria": "",
+              "state": "open",
+              "depends_on": [
+                "bc-00000000000040008000000000000001"
+              ],
+              "claim": null,
+              "notes": [],
+              "created_at": "2026-11-14T00:00:00Z",
+              "updated_at": "2026-11-14T00:00:00Z",
+              "revision": 1
+            },
+            "blockers": [
+              {
+                "id": "bc-00000000000040008000000000000001",
+                "state": "open"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "missing-dependency",
+    "issues": [
+      {
+        "id": "bc-00000000000040008000000000000002",
+        "title": "Dependent",
+        "description": "",
+        "acceptance_criteria": "",
+        "state": "open",
+        "depends_on": [
+          "bc-00000000000040008000000000000001"
+        ],
+        "claim": null,
+        "notes": [],
+        "created_at": "2026-11-14T00:00:00Z",
+        "updated_at": "2026-11-14T00:00:00Z",
+        "revision": 1
+      }
+    ],
+    "commands": [
+      {
+        "args": [
+          "--validate"
+        ],
+        "code": 1
+      }
+    ]
+  },
+  {
+    "name": "cycle",
+    "issues": [
+      {
+        "id": "bc-00000000000040008000000000000001",
+        "title": "Prerequisite",
+        "description": "",
+        "acceptance_criteria": "",
+        "state": "open",
+        "depends_on": [
+          "bc-00000000000040008000000000000002"
+        ],
+        "claim": null,
+        "notes": [],
+        "created_at": "2026-11-14T00:00:00Z",
+        "updated_at": "2026-11-14T00:00:00Z",
+        "revision": 1
+      },
+      {
+        "id": "bc-00000000000040008000000000000002",
+        "title": "Dependent",
+        "description": "",
+        "acceptance_criteria": "",
+        "state": "open",
+        "depends_on": [
+          "bc-00000000000040008000000000000001"
+        ],
+        "claim": null,
+        "notes": [],
+        "created_at": "2026-11-14T00:00:00Z",
+        "updated_at": "2026-11-14T00:00:00Z",
+        "revision": 1
+      }
+    ],
+    "commands": [
+      {
+        "args": [
+          "--ready"
+        ],
+        "code": 1
+      }
+    ]
+  },
+  {
+    "name": "unknown-field",
+    "issues": [
+      {
+        "id": "bc-00000000000040008000000000000001",
+        "title": "Prerequisite",
+        "description": "",
+        "acceptance_criteria": "",
+        "state": "open",
+        "depends_on": [],
+        "claim": null,
+        "notes": [],
+        "created_at": "2026-11-14T00:00:00Z",
+        "updated_at": "2026-11-14T00:00:00Z",
+        "revision": 1,
+        "extra": true
+      }
+    ],
+    "commands": [
+      {
+        "args": [
+          "--show",
+          "bc-00000000000040008000000000000001"
+        ],
+        "code": 1
+      }
+    ]
+  },
+  {
+    "name": "unsupported-version",
+    "manifest": {
+      "format": "beadcrumbs",
+      "version": 2
+    },
+    "issues": [],
+    "commands": [
+      {
+        "args": [
+          "--init"
+        ],
+        "code": 1
+      }
+    ]
+  }
+]

@@ -1,0 +1,22 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Beadcrumbs.Cli", "src\Beadcrumbs.Cli\Beadcrumbs.Cli.csproj", "{C643DC4C-57F3-4F58-A714-00B2DA05891A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Beadcrumbs.Tests", "tests\Beadcrumbs.Tests\Beadcrumbs.Tests.csproj", "{EA4C149B-6AD3-469C-9EBB-F1D24CE04709}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{C643DC4C-57F3-4F58-A714-00B2DA05891A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C643DC4C-57F3-4F58-A714-00B2DA05891A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C643DC4C-57F3-4F58-A714-00B2DA05891A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C643DC4C-57F3-4F58-A714-00B2DA05891A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{EA4C149B-6AD3-469C-9EBB-F1D24CE04709}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EA4C149B-6AD3-469C-9EBB-F1D24CE04709}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EA4C149B-6AD3-469C-9EBB-F1D24CE04709}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EA4C149B-6AD3-469C-9EBB-F1D24CE04709}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "issues": {
+      "type": "array",
+      "items": {
+        "$ref": "issue.schema.json"
+      }
+    },
+    "blocked": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "issue": {
+            "$ref": "issue.schema.json"
+          },
+          "blockers": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "pattern": "^bc-[0-9a-f]{12}4[0-9a-f]{3}[89ab][0-9a-f]{15}(?![\\s\\S])"
+                },
+                "state": {
+                  "enum": [
+                    "open",
+                    "claimed"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "state"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "issue",
+          "blockers"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "validation": {
+      "type": "object",
+      "properties": {
+        "valid": {
+          "const": true
+        },
+        "issue_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "valid",
+        "issue_count"
+      ],
+      "additionalProperties": false
+    },
+    "board": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "issue_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "generated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "path",
+        "issue_count",
+        "generated_at"
+      ],
+      "additionalProperties": false
+    }
+  }
+}
