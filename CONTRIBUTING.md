@@ -48,7 +48,7 @@ tests/
 integration/
   run.py                   # Persistent lifecycle example
   test_clients.py          # 5-client × 10-pair matrix
-implementations/           # Go, Rust, .NET, TypeScript clients
+implementations/           # Go, Rust, .NET, TypeScript clients (python/ points to the root file)
 .agents/skills/            # Agent skill for protocol-affecting changes
 AGENTS.md, PROGRESS.md     # Instructions and handoff log for coding agents
 ```

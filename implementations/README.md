@@ -1,10 +1,10 @@
 # Language implementations
 
-Five independent clients implement the shared v1 draft. Python remains a copy-and-run single file at the repository root. Each other client operates directly on the store without invoking Python.
+Five independent clients implement the shared v1 draft. Python remains a copy-and-run single file at the repository root; [python/](python/README.md) explains why. Each other client operates directly on the store without invoking Python.
 
 | Client | Source | Build requirements | Runtime |
 | --- | --- | --- | --- |
-| Python | ../beadcrumbs.py | None | Python 3.10+ standard library |
+| Python | [../beadcrumbs.py](../beadcrumbs.py) ([why the root](python/README.md)) | None | Python 3.10+ standard library |
 | TypeScript/npm | javascript/src | Node 22+, npm, pinned TypeScript dev dependencies | Node 22+, no npm runtime dependencies |
 | Go | go/cmd and go/internal | Go 1.22+ standard library | Native executable |
 | Rust | rust/src | Rust 1.85+, Cargo, locked crates | Native executable |
