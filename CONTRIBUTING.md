@@ -67,6 +67,8 @@ flowchart LR
     R --> PR["Open a PR"]
 ```
 
+`main` is protected: every change, including the maintainer's, lands through a pull request. A review from the maintainer is requested automatically through [CODEOWNERS](.github/CODEOWNERS), and one approval with all conversations resolved is required before merging.
+
 ### Protocol-affecting changes
 
 If your change touches store records, issue state, claim tokens, locking, or atomic publication, follow the [Beadcrumbs protocol skill](.agents/skills/beadcrumbs-protocol/SKILL.md):
