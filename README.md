@@ -270,15 +270,17 @@ The suites cover competing claims across processes, stale tokens, simultaneous i
 
 ## 🆚 How does it compare?
 
-| | Beadcrumbs | [Beads](https://github.com/steveyegge/beads) | GitHub Issues | `TODO.md` |
+| | Beadcrumbs | [Beads](https://github.com/gastownhall/beads) | GitHub Issues | `TODO.md` |
 | --- | :---: | :---: | :---: | :---: |
-| Works fully offline / air-gapped | ✅ | ✅ | ❌ | ✅ |
-| Zero install (single stdlib file) | ✅ | ❌ | n/a | ✅ |
+| Works fully offline / air-gapped | ✅ | ✅ (embedded Dolt) | ❌ | ✅ |
+| Nothing to install (single stdlib file) | ✅ | ❌ (`bd` binary) | n/a | ✅ |
+| Plain files you can `cat` and `grep` | ✅ JSON | ⚠️ Dolt DB + JSONL export | ❌ | ✅ |
 | Atomic, race-safe claims | ✅ | ✅ | ❌ | ❌ |
 | Dependency-aware ready list | ✅ | ✅ | ⚠️ | ❌ |
-| Priorities, labels, epics, sync | ❌ (roadmap) | ✅ | ✅ | ❌ |
+| Priorities, labels, epics | ❌ (priority planned) | ✅ | ✅ | ❌ |
+| Multi-machine sync | ❌ (out of scope for v1) | ✅ (Dolt remotes) | ✅ | ⚠️ via Git |
 
-Beadcrumbs grew out of a [feature review of Beads](docs/research/beads-feature-extraction.md). It trades Beads' richer feature set for the smallest possible deployment footprint and a plain-file protocol that any language can implement.
+Beadcrumbs grew out of a [feature review of Beads](docs/research/beads-feature-extraction.md). The Beads column reflects commit `53cc7d8` (November 2026). It trades Beads' richer feature set for the smallest possible deployment footprint and a plain-file protocol that any language can implement.
 
 ## 📚 Documentation
 
@@ -312,7 +314,7 @@ Beadcrumbs is **pre-release**. The protocol is *v1 draft 1* and may change befor
 - coordinates cooperating processes on **one machine and one local filesystem**. Network shares and synced copies are not validated.
 - has **no automatic lock or claim expiry**. Recovery is an explicit operator step ([how](docs/faq.md#a-worker-crashed-while-holding-a-claim)).
 - guarantees atomicity under **process interruption**, not power loss.
-- treats the workspace as **trusted**. Agent labels are attribution, not authentication ([threat model](docs/security.md)).
+- treats the workspace as **trusted**. Agent labels are attribution, not authentication ([threat model](docs/security.md), [reporting vulnerabilities](SECURITY.md)).
 
 ## 🤝 Contributing
 

@@ -27,7 +27,7 @@ These are the project's hard constraints. Changes that break them won't be merge
 No setup is needed for the reference client:
 
 ```sh
-git clone <this repository> beadcrumbs && cd beadcrumbs
+git clone https://github.com/Frankiey/beadcrumbs.git && cd beadcrumbs
 python3 beadcrumbs.py --help
 python3 -m unittest discover -s tests -v
 ```
@@ -116,7 +116,7 @@ Please include:
 - stderr output
 - if you can share it, a minimal store that reproduces the problem (remove sensitive text first)
 
-For suspected security issues, such as path handling or symlink and reparse-point escapes, please describe the impact privately to the maintainers instead of opening a public issue.
+For suspected security issues, such as path handling or symlink and reparse-point escapes, follow [SECURITY.md](SECURITY.md) instead of opening a public issue.
 
 ## Style
 

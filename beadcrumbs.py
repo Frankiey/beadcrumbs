@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 2026 The Beadcrumbs Authors
+# Copyright 2026 Frankiey
 # SPDX-License-Identifier: Apache-2.0
 """Offline, filesystem-native issue tracking. Python 3.10+, standard library."""
 import argparse
