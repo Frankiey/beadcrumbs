@@ -53,7 +53,7 @@ test("alternate issue codec supports lifecycle and pure rendering", () => {
       validateIssue(closed);
       const issues = loadIssues(root, codec);
       const before = JSON.stringify([...issues]);
-      assert.match(renderBoard(issues, "2026-11-14T00:00:00Z"), /Closed \(1\)/);
+      assert.match(renderBoard(issues, "2026-11-14T00:00:00Z"), /\| closed \| /);
       assert.equal(JSON.stringify([...issues]), before);
       assert.deepEqual(fs.readdirSync(path.join(root, "issues")), [issue.id + ".example"]);
     });

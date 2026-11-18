@@ -3,7 +3,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { actions, parseArguments } from "./arguments.js";
 import { Failure, requireValue } from "./model.js";
-import { initializeStore, loadIssues, readManifest, withStoreLock } from "./store.js";
+import { initializeStore, loadEpics, loadIssues, readManifest, withStoreLock } from "./store.js";
 import { runAction } from "./commands.js";
 import { outputJson, safeText } from "./render.js";
 
@@ -25,7 +25,8 @@ function main(): void {
     const result = withStoreLock(root, args.action === "init", () => {
       if (args.action === "init") initializeStore(root);
       requireValue(readManifest(root), "Store is uninitialized");
-      return runAction(args, root, loadIssues(root));
+      const epics = loadEpics(root);
+      return runAction(args, root, loadIssues(root, undefined, epics), undefined, epics);
     });
     fs.writeFileSync(1, outputJson(result, args.json) + "\n");
   } catch (error) {

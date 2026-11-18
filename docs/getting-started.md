@@ -5,7 +5,7 @@ This tutorial walks through the full Beadcrumbs lifecycle in a scratch directory
 You will:
 
 1. Create a store.
-2. Add two issues, one depending on the other.
+2. Add an epic and two issues, one depending on the other.
 3. See why one is blocked.
 4. Claim, annotate, and close the first issue.
 5. Watch the second one become ready.
@@ -52,16 +52,23 @@ python3 beadcrumbs.py --init
 }
 ```
 
-You now have `.beadcrumbs/store.json` and an empty `.beadcrumbs/issues/` directory. Running `--init` again on a valid store is safe and changes nothing.
+You now have `.beadcrumbs/store.json` and empty `.beadcrumbs/issues/` and `.beadcrumbs/epics/` directories. Running `--init` again on a valid store is safe and changes nothing.
 
 > **Workspace selection:** Beadcrumbs acts on the current directory, or exactly the directory you pass with `--workspace PATH`. Unlike Git, it never walks up to parent directories.
 
-## 2. Create issues
+## 2. Create an epic and issues
 
-Create a prerequisite with a description and acceptance criteria:
+An epic groups related issues under a short key. It's optional, but it makes the board easier to read:
 
 ```sh
-SCHEMA=$(python3 beadcrumbs.py --create "Write schema" \
+python3 beadcrumbs.py --create-epic orders-v2 --title "Orders v2" \
+  --description "New order and customer storage behind the public API."
+```
+
+Create a prerequisite with a description and acceptance criteria. Give it a priority from `0` (most urgent) to `4` (the default is `2`), and put it in the epic:
+
+```sh
+SCHEMA=$(python3 beadcrumbs.py --create "Write schema" --priority 1 --epic orders-v2 \
   --description "Define the v2 tables for orders and customers." \
   --acceptance-criteria "Migration applies cleanly to an empty database." \
   --json | jq -r .id)
@@ -81,6 +88,14 @@ API=$(python3 beadcrumbs.py --create "Wire API" --depends-on "$SCHEMA" --json | 
 ```
 
 Repeat `--depends-on` once for each dependency. Dependencies must already exist and can't be changed later.
+
+The API issue has no epic yet. Unlike the title, type, and priority, the epic can change at any time:
+
+```sh
+python3 beadcrumbs.py --set-epic "$API" --epic orders-v2
+```
+
+Each issue also has a type: `task` (the default), `bug`, `chore`, `docs`, or `spike`. Set it at creation with `--type bug`. Types only label work for filtering; they don't change how it flows.
 
 ## 3. Inspect the work
 
@@ -107,7 +122,7 @@ python3 beadcrumbs.py --blocked --json | jq '.[] | {title: .issue.title, blocker
 }
 ```
 
-Other read commands are `--show ID` for one issue and `--list [--state open|claimed|closed]` for all issues.
+Other read commands are `--show ID` for one issue, `--list` for all issues, and `--show-epic orders-v2` for an epic with its status counts. `--list` and `--ready` accept `--type TYPE` and `--epic KEY` (or `--epic none`) filters, and `--list` also accepts `--state open|claimed|closed`.
 
 ## 4. Claim, take notes, and close
 
@@ -146,7 +161,7 @@ python3 beadcrumbs.py --close "$SCHEMA" --token "$TOKEN" --json | jq '{state, re
 { "state": "closed", "revision": 4 }
 ```
 
-The revision went from 1 (create) to 2 (claim), 3 (note), and 4 (close).
+The revision went from 1 (create) to 2 (claim), 3 (note), and 4 (close). The API issue is at revision 2, because `--set-epic` also counts as a change.
 
 > Changed your mind instead of finishing? `--release ID --token TOKEN` returns the issue to `open` so someone else can claim it.
 
@@ -168,14 +183,14 @@ cat board.md
 python3 beadcrumbs.py --validate
 ```
 
-`board.md` groups every issue into Ready, Blocked, Claimed, and Closed tables. `--validate` checks the whole store and reports `{"valid": true, "issue_count": 2}`.
+`board.md` starts with a summary of Ready, Blocked, Claimed, and Closed counts per epic, then lists each epic's issues with their status, type, and priority. `--validate` checks the whole store and reports `{"valid": true, "issue_count": 2, "epic_count": 1}`.
 
 ## Look under the hood
 
 Everything is plain JSON, so you can read it with ordinary tools:
 
 ```sh
-ls .beadcrumbs/issues/
+ls .beadcrumbs/issues/ .beadcrumbs/epics/
 cat .beadcrumbs/issues/$SCHEMA.json
 ```
 

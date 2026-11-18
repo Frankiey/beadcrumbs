@@ -49,13 +49,27 @@ class CliTests(unittest.TestCase):
             ["--create", ""],
             ["--claim", MISSING],
             ["--ready", "--show", MISSING],
+            ["--create", "Task", "--type", "feature"],
+            ["--create", "Task", "--priority", "5"],
+            ["--create", "Task", "--priority", "01"],
+            ["--create", "Task", "--epic", "Auth"],
+            ["--create-epic", "none", "--title", "Reserved"],
+            ["--create-epic", "con", "--title", "Windows device name"],
+            ["--create-epic", "auth"],
+            ["--create-epic", "auth", "--title", ""],
+            ["--edit-epic", "auth"],
+            ["--edit-epic", "auth", "--title", "Renamed"],
+            ["--set-epic", MISSING],
+            ["--set-epic", MISSING, "--epic", "../escape"],
+            ["--blocked", "--epic", "auth"],
+            ["--show-epic", "-bad"],
         ]:
             with self.subTest(args=args):
                 self.call(*args, code=2)
         self.assertEqual(list(self.workspace.iterdir()), [])
 
     def test_shared_fixtures(self):
-        cases = json.loads((ROOT / "tests/fixtures/cases.json").read_text())
+        cases = json.loads((ROOT / "tests/fixtures/cases.json").read_text(encoding="utf-8"))
         for case in cases:
             with self.subTest(case=case["name"]), tempfile.TemporaryDirectory() as folder:
                 old = self.workspace
@@ -63,11 +77,15 @@ class CliTests(unittest.TestCase):
                 try:
                     store = self.workspace / ".beadcrumbs"
                     (store / "issues").mkdir(parents=True)
+                    (store / "epics").mkdir()
                     (store / "store.json").write_text(
                         json.dumps(case.get("manifest", {"format": "beadcrumbs", "version": 1}))
                     )
                     for issue in case["issues"]:
                         (store / "issues" / (issue["id"] + ".json")).write_text(json.dumps(issue))
+                    epic_files = case.get("epic_files") or {e["key"] + ".json": e for e in case.get("epics", [])}
+                    for name, epic in epic_files.items():
+                        (store / "epics" / name).write_text(json.dumps(epic))
                     before = {str(p): p.read_bytes() for p in store.rglob("*") if p.is_file()}
                     for command in case["commands"]:
                         result = self.call(*command["args"], "--json", code=command["code"])
@@ -100,6 +118,40 @@ class CliTests(unittest.TestCase):
         self.call("--close", a["id"], "--token", token, code=4)
         self.assertEqual(self.value("--validate")["issue_count"], 2)
         self.value("--note", a["id"], "--agent", "reviewer", "--text", "Verified")
+
+    def test_types_priorities_and_epics(self):
+        self.init()
+        default = self.value("--create", "Default")
+        self.assertEqual((default["type"], default["priority"], default["epic"]), ("task", 2, None))
+        self.call("--create", "Orphan", "--epic", "auth", code=3)
+        epic = self.value("--create-epic", "auth", "--title", "Auth rework", "--description", "Tokens")
+        self.assertEqual((epic["revision"], epic["created_at"]), (1, epic["updated_at"]))
+        self.call("--create-epic", "auth", "--title", "Again", code=4)
+        bug = self.value("--create", "Bug", "--type", "bug", "--priority", "0", "--epic", "auth")
+        self.assertEqual((bug["type"], bug["priority"], bug["epic"]), ("bug", 0, "auth"))
+        self.assertEqual([item["id"] for item in self.value("--ready")], [bug["id"], default["id"]])
+        moved = self.value("--set-epic", default["id"], "--epic", "auth")
+        self.assertEqual((moved["epic"], moved["revision"]), ("auth", 2))
+        self.call("--set-epic", default["id"], "--epic", "auth", code=4)
+        self.call("--set-epic", default["id"], "--epic", "other", code=3)
+        token = self.value("--claim", bug["id"], "--agent", "worker")["claim"]["token"]
+        self.value("--close", bug["id"], "--token", token)
+        cleared = self.value("--set-epic", bug["id"], "--epic", "none")
+        self.assertEqual((cleared["epic"], cleared["state"], cleared["revision"]), (None, "closed", 4))
+        (self.workspace / "epic.md").write_bytes(b"Line\n")
+        edited = self.value("--edit-epic", "auth", "--description-file", "epic.md")
+        self.assertEqual((edited["title"], edited["description"], edited["revision"]), ("Auth rework", "Line\n", 2))
+        self.call("--edit-epic", "auth", "--description", "Line\n", code=4)
+        self.call("--edit-epic", "missing", "--description", "x", code=3)
+        self.assertEqual(self.value("--epics"), [edited])
+        shown = self.value("--show-epic", "auth")
+        self.assertEqual(shown["counts"], {"ready": 1, "blocked": 0, "claimed": 0, "closed": 0})
+        self.assertEqual(shown["issues"], [moved])
+        self.assertEqual(self.value("--list", "--epic", "none"), [cleared])
+        self.assertEqual(self.value("--validate"), {"valid": True, "issue_count": 2, "epic_count": 1})
+        path = self.workspace / ".beadcrumbs/epics/auth.json"
+        path.unlink()
+        self.call("--validate", code=1)
 
     def test_release_stale_token_and_repeated_claim(self):
         self.init()
@@ -217,7 +269,7 @@ class CliTests(unittest.TestCase):
         extra = store / "important.txt"
         extra.write_text("preserve")
         self.call("--init", code=1)
-        self.assertEqual(extra.read_text(), "preserve")
+        self.assertEqual(extra.read_text(encoding="utf-8"), "preserve")
 
     def test_simultaneous_initialization(self):
         processes = [
@@ -229,7 +281,7 @@ class CliTests(unittest.TestCase):
         for process in processes:
             _stdout, stderr = process.communicate(timeout=20)
             self.assertIn(process.returncode, (0, 5), stderr)
-        self.assertEqual(self.value("--validate"), {"valid": True, "issue_count": 0})
+        self.assertEqual(self.value("--validate"), {"valid": True, "issue_count": 0, "epic_count": 0})
 
     def test_concurrent_notes_preserve_successful_writes(self):
         self.init()
@@ -277,16 +329,18 @@ class CliTests(unittest.TestCase):
         result = self.value("--board", "--workspace", str(other))
         path = other / "board.md"
         self.assertEqual(result["path"], str(path.resolve()))
-        self.assertEqual(result["issue_count"], 0)
+        self.assertEqual((result["issue_count"], result["epic_count"]), (0, 0))
         self.assertFalse((self.workspace / "board.md").exists())
-        content = path.read_text()
-        for section in ("Ready", "Blocked", "Claimed", "Closed"):
-            self.assertIn(f"## {section} (0)", content)
+        content = path.read_text(encoding="utf-8")
+        self.assertIn("| No epic | 0 | 0 | 0 | 0 |", content)
+        self.assertIn("## No epic\n\nNo issues.", content)
         self.assertIn(result["generated_at"], content)
 
     def test_board_groups_escaping_and_refresh(self):
         self.init()
-        first = self.value("--create", "Ready")
+        self.value("--create-epic", "empty", "--title", "Empty <b>epic</b>")
+        self.value("--create-epic", "work", "--title", "Work")
+        first = self.value("--create", "Ready", "--epic", "work", "--type", "bug", "--priority", "1")
         dependent = self.value("--create", "Blocked", "--depends-on", first["id"])
         active = self.value("--create", "Unsafe | [link](https://example.test) <script>\nnext\u202e")
         claim = self.value("--claim", active["id"], "--agent", "worker")
@@ -297,9 +351,13 @@ class CliTests(unittest.TestCase):
         before = {p.name: p.read_bytes() for p in files.iterdir()}
         self.value("--board")
         path = self.workspace / "board.md"
-        content = path.read_text()
-        for section in ("Ready", "Blocked", "Claimed", "Closed"):
-            self.assertIn(f"## {section} (1)", content)
+        content = path.read_text(encoding="utf-8")
+        self.assertIn("| No epic | 0 | 1 | 1 | 1 |", content)
+        self.assertIn("| Work (work) | 1 | 0 | 0 | 0 |", content)
+        self.assertIn("## Empty &#60;b&#62;epic&#60;/b&#62; (empty)\n\nNo issues.", content)
+        self.assertIn(f"| ready | {first['id']} | bug | P1 | Ready | — | — |", content)
+        self.assertLess(content.index("## Empty"), content.index("## Work"))
+        self.assertLess(content.index("## Work"), content.index("## No epic"))
         self.assertIn("&#124;", content)
         self.assertNotIn("<script>", content)
         self.assertNotIn("\u202e", content)
@@ -307,9 +365,9 @@ class CliTests(unittest.TestCase):
         self.assertEqual(before, {p.name: p.read_bytes() for p in files.iterdir()})
         token = self.value("--claim", first["id"], "--agent", "worker")["claim"]["token"]
         self.value("--close", first["id"], "--token", token)
-        self.assertEqual(path.read_text(), content)
+        self.assertEqual(path.read_text(encoding="utf-8"), content)
         self.value("--board")
-        self.assertIn("## Blocked (0)", path.read_text())
+        self.assertIn("| No epic | 1 | 0 | 1 | 1 |", path.read_text(encoding="utf-8"))
         self.assertIn(dependent["id"], self.value("--ready")[0]["id"])
 
     def test_board_failure_preserves_previous_snapshot(self):
@@ -332,7 +390,7 @@ class CliTests(unittest.TestCase):
         target.write_text("Keep me")
         (self.workspace / "board.md").symlink_to(target)
         self.call("--board", code=1)
-        self.assertEqual(target.read_text(), "Keep me")
+        self.assertEqual(target.read_text(encoding="utf-8"), "Keep me")
 
     @unittest.skipIf(os.name == "nt", "POSIX FIFO test")
     def test_fifo_issue_is_rejected_without_blocking(self):

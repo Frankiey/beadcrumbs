@@ -8,9 +8,28 @@ use std::{
 };
 
 const ACTIONS: &[&str] = &[
-    "init", "create", "show", "list", "ready", "blocked", "validate", "claim", "note", "release",
-    "close", "board", "help", "version",
+    "init",
+    "create",
+    "show",
+    "list",
+    "ready",
+    "blocked",
+    "validate",
+    "claim",
+    "note",
+    "release",
+    "close",
+    "set-epic",
+    "create-epic",
+    "edit-epic",
+    "show-epic",
+    "epics",
+    "board",
+    "help",
+    "version",
 ];
+const ISSUE_ACTIONS: &[&str] = &["show", "claim", "note", "release", "close", "set-epic"];
+const EPIC_ACTIONS: &[&str] = &["create-epic", "edit-epic", "show-epic"];
 pub struct Arguments {
     pub action: String,
     pub value: String,
@@ -36,6 +55,14 @@ pub fn parse(argv: &[String]) -> Result<Arguments> {
         "note",
         "release",
         "close",
+        "set-epic",
+        "create-epic",
+        "edit-epic",
+        "show-epic",
+        "type",
+        "priority",
+        "epic",
+        "title",
         "workspace",
         "state",
         "agent",
@@ -97,8 +124,15 @@ pub fn parse(argv: &[String]) -> Result<Arguments> {
                 "description",
                 "description-file",
                 "acceptance-criteria",
+                "type",
+                "priority",
+                "epic",
             ],
-            "list" => &["state"],
+            "list" => &["state", "type", "epic"],
+            "ready" => &["type", "epic"],
+            "set-epic" => &["epic"],
+            "create-epic" => &["title", "description", "description-file"],
+            "edit-epic" => &["description", "description-file"],
             "claim" => &["agent"],
             "note" => &["agent", "text"],
             "release" | "close" => &["token"],
@@ -112,8 +146,37 @@ pub fn parse(argv: &[String]) -> Result<Arguments> {
                 "Option does not apply",
             )?;
         }
-        if ["show", "claim", "note", "release", "close"].contains(&args.action.as_str()) {
+        let action = args.action.as_str();
+        if ISSUE_ACTIONS.contains(&action) {
             require(id_valid(&args.value), "Invalid ID")?;
+        }
+        if EPIC_ACTIONS.contains(&action) {
+            require(epic_key_valid(&args.value), "Invalid epic key")?;
+        }
+        if let Some(kind) = args.options.get("type") {
+            require(ISSUE_TYPES.contains(&kind.as_str()), "Invalid type")?;
+        }
+        if let Some(priority) = args.options.get("priority") {
+            require(
+                priority.len() == 1 && (b'0'..=b'4').contains(&priority.as_bytes()[0]),
+                "Priority must be 0 through 4",
+            )?;
+        }
+        if action == "set-epic" {
+            require(args.options.contains_key("epic"), "--epic is required")?;
+        }
+        if let Some(epic) = args.options.get("epic") {
+            require(epic == "none" || epic_key_valid(epic), "Invalid epic key")?;
+        }
+        if action == "create-epic" {
+            require(!args.get("title").is_empty(), "--title is required")?;
+        }
+        if action == "edit-epic" {
+            require(
+                args.options.contains_key("description")
+                    || args.options.contains_key("description-file"),
+                "A new description is required",
+            )?;
         }
         if args.action == "create" {
             require(!args.value.is_empty(), "Empty title")?;
@@ -186,102 +249,201 @@ fn cell(value: &str) -> String {
     }
     output
 }
-pub fn board(issues: &Issues, generated: &str) -> String {
-    let names = ["Ready", "Blocked", "Claimed", "Closed"];
-    let mut sections: [Vec<String>; 4] = Default::default();
-    for issue in ordered(issues) {
-        let unresolved = blockers(issue, issues);
-        let index = match field(issue, "state") {
-            "open" => {
-                if unresolved.is_empty() {
-                    0
-                } else {
-                    1
-                }
-            }
-            "claimed" => 2,
-            _ => 3,
-        };
-        let owner = issue["claim"]
-            .as_object()
-            .map(|c| field(c, "agent"))
-            .unwrap_or("—");
-        let deps = unresolved
-            .iter()
-            .map(|v| {
-                format!(
-                    "{} ({})",
-                    v["id"].as_str().unwrap(),
-                    v["state"].as_str().unwrap()
-                )
-            })
-            .collect::<Vec<_>>()
-            .join(", ");
-        let deps = if deps.is_empty() { "—" } else { &deps };
-        sections[index].push(format!(
-            "| {} | {} | {} | {} |",
-            cell(field(issue, "id")),
-            cell(field(issue, "title")),
-            cell(owner),
-            cell(deps)
-        ));
-    }
-    let mut lines = vec![
+pub fn board(issues: &Issues, epics: &Epics, generated: &str) -> String {
+    let mut keys: Vec<Option<&str>> = epics.keys().map(|k| Some(k.as_str())).collect();
+    keys.push(None);
+    let name = |key: Option<&str>| match key {
+        Some(key) => format!("{} ({key})", cell(field(&epics[key], "title"))),
+        None => "No epic".to_string(),
+    };
+    let members = |key: Option<&str>| -> Vec<&Issue> {
+        ordered(issues)
+            .into_iter()
+            .filter(|issue| issue["epic"].as_str() == key)
+            .collect()
+    };
+    let mut lines: Vec<String> = vec![
         "# Beadcrumbs board".into(),
         "".into(),
         format!("Generated at {generated}."),
         "".into(),
         "Snapshot of the issue store. Regenerate with --board. Manual edits are replaced.".into(),
         "".into(),
+        "## Summary".into(),
+        "".into(),
+        "| Epic | Ready | Blocked | Claimed | Closed |".into(),
+        "| --- | --- | --- | --- | --- |".into(),
     ];
-    for (index, name) in names.iter().enumerate() {
-        lines.push(format!("## {name} ({})", sections[index].len()));
+    for key in &keys {
+        let group = members(*key);
+        let counts: Vec<String> = STATUSES
+            .iter()
+            .map(|state| {
+                group
+                    .iter()
+                    .filter(|issue| status(issue, issues) == *state)
+                    .count()
+                    .to_string()
+            })
+            .collect();
+        lines.push(format!("| {} | {} |", name(*key), counts.join(" | ")));
+    }
+    lines.push("".into());
+    for key in &keys {
+        lines.push(format!("## {}", name(*key)));
         lines.push("".into());
-        if sections[index].is_empty() {
+        let group = members(*key);
+        if group.is_empty() {
             lines.push("No issues.".into());
-        } else {
-            lines.push("| ID | Title | Agent | Blockers |".into());
-            lines.push("| --- | --- | --- | --- |".into());
-            lines.extend(sections[index].iter().cloned());
+            lines.push("".into());
+            continue;
+        }
+        lines.push("| Status | ID | Type | Priority | Title | Agent | Blockers |".into());
+        lines.push("| --- | --- | --- | --- | --- | --- | --- |".into());
+        for state in STATUSES {
+            for issue in group.iter().filter(|issue| status(issue, issues) == *state) {
+                let owner = issue["claim"]
+                    .as_object()
+                    .map(|c| field(c, "agent"))
+                    .unwrap_or("—");
+                let deps = blockers(issue, issues)
+                    .iter()
+                    .map(|v| {
+                        format!(
+                            "{} ({})",
+                            v["id"].as_str().unwrap(),
+                            v["state"].as_str().unwrap()
+                        )
+                    })
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                let deps = if deps.is_empty() { "—" } else { &deps };
+                let priority = format!("P{}", issue["priority"].as_u64().unwrap());
+                let cells = [
+                    *state,
+                    field(issue, "id"),
+                    field(issue, "type"),
+                    &priority,
+                    field(issue, "title"),
+                    owner,
+                    deps,
+                ];
+                let cells: Vec<String> = cells.iter().map(|c| cell(c)).collect();
+                lines.push(format!("| {} |", cells.join(" | ")));
+            }
         }
         lines.push("".into());
     }
     lines.join("\n")
 }
-pub fn run(args: &Arguments, root: &Path, issues: &Issues, codec: &dyn Codec) -> Result<Value> {
+fn find_epic<'a>(key: &str, epics: &'a Epics) -> Result<&'a Epic> {
+    epics
+        .get(key)
+        .ok_or_else(|| Failure::new(format!("Epic not found: {key}"), 3))
+}
+fn in_scope(args: &Arguments, issue: &Issue, epics: &Epics) -> Result<bool> {
+    if args.options.contains_key("type") && field(issue, "type") != args.get("type") {
+        return Ok(false);
+    }
+    match args.options.get("epic").map(String::as_str) {
+        None => Ok(true),
+        Some("none") => Ok(issue["epic"].is_null()),
+        Some(key) => {
+            find_epic(key, epics)?;
+            Ok(issue["epic"].as_str() == Some(key))
+        }
+    }
+}
+fn filtered(args: &Arguments, issues: &Issues, epics: &Epics) -> Result<Vec<Issue>> {
+    let mut selected = Vec::new();
+    for issue in ordered(issues) {
+        let wanted = if args.action == "list" {
+            !args.options.contains_key("state") || field(issue, "state") == args.get("state")
+        } else {
+            status(issue, issues) == "ready"
+        };
+        if wanted && in_scope(args, issue, epics)? {
+            selected.push(issue.clone());
+        }
+    }
+    Ok(selected)
+}
+pub fn run(
+    args: &Arguments,
+    root: &Path,
+    issues: &Issues,
+    epics: &Epics,
+    codec: &dyn Codec,
+) -> Result<Value> {
     match args.action.as_str() {
         "init" => return Ok(store::manifest()),
-        "validate" => return Ok(json!({"valid":true,"issue_count":issues.len()})),
-        "list" | "ready" => {
-            let selected: Vec<_> = ordered(issues)
-                .into_iter()
-                .filter(|issue| {
-                    if args.action == "list" {
-                        !args.options.contains_key("state")
-                            || field(issue, "state") == args.get("state")
-                    } else {
-                        field(issue, "state") == "open" && blockers(issue, issues).is_empty()
-                    }
-                })
-                .cloned()
-                .collect();
-            return Ok(json!(selected));
+        "validate" => {
+            return Ok(json!({"valid":true,"issue_count":issues.len(),"epic_count":epics.len()}))
         }
+        "list" | "ready" => return Ok(json!(filtered(args, issues, epics)?)),
         "blocked" => {
             return Ok(json!(ordered(issues)
                 .into_iter()
-                .filter(
-                    |issue| field(issue, "state") == "open" && !blockers(issue, issues).is_empty()
-                )
+                .filter(|issue| status(issue, issues) == "blocked")
                 .map(|issue| json!({"issue":issue,"blockers":blockers(issue,issues)}))
                 .collect::<Vec<_>>()))
+        }
+        "epics" => return Ok(json!(epics.values().collect::<Vec<_>>())),
+        "show-epic" => {
+            let epic = find_epic(&args.value, epics)?;
+            let members: Vec<&Issue> = ordered(issues)
+                .into_iter()
+                .filter(|issue| issue["epic"].as_str() == Some(args.value.as_str()))
+                .collect();
+            let mut counts = serde_json::Map::new();
+            for state in STATUSES {
+                let count = members
+                    .iter()
+                    .filter(|issue| status(issue, issues) == *state)
+                    .count();
+                counts.insert((*state).into(), json!(count));
+            }
+            return Ok(json!({"epic":epic,"counts":counts,"issues":members}));
+        }
+        "create-epic" => {
+            if epics.contains_key(&args.value) {
+                return Err(Failure::new("Epic already exists", 4));
+            }
+            store::path_kind(
+                &root.join("epics").join(format!("{}.json", args.value)),
+                false,
+                true,
+            )?;
+            let created = now()?;
+            let epic = json!({"key":args.value,"title":args.get("title"),"description":args.get("description"),
+                "created_at":created,"updated_at":created,"revision":1})
+            .as_object()
+            .unwrap()
+            .clone();
+            store::save_epic(root, &epic)?;
+            return Ok(Value::Object(epic));
+        }
+        "edit-epic" => {
+            let mut epic = find_epic(&args.value, epics)?.clone();
+            if field(&epic, "description") == args.get("description") {
+                return Err(Failure::new("Epic is unchanged", 4));
+            }
+            let revision = epic["revision"].as_u64().unwrap();
+            require(revision < MAX_REVISION, "Revision exhausted")?;
+            epic.insert("description".into(), json!(args.get("description")));
+            epic.insert("updated_at".into(), json!(now()?));
+            epic.insert("revision".into(), json!(revision + 1));
+            store::save_epic(root, &epic)?;
+            return Ok(Value::Object(epic));
         }
         "board" => {
             let path = root.parent().unwrap().join("board.md");
             store::path_kind(&path, false, true)?;
             let generated = now()?;
-            store::publish(&path, board(issues, &generated).as_bytes())?;
-            return Ok(json!({"path":path,"issue_count":issues.len(),"generated_at":generated}));
+            store::publish(&path, board(issues, epics, &generated).as_bytes())?;
+            return Ok(
+                json!({"path":path,"issue_count":issues.len(),"epic_count":epics.len(),"generated_at":generated}),
+            );
         }
         _ => (),
     }
@@ -292,13 +454,28 @@ pub fn run(args: &Arguments, root: &Path, issues: &Issues, codec: &dyn Codec) ->
                 return Err(Failure::new("Issue not found", 3));
             }
         }
+        let epic = match args.options.get("epic").map(String::as_str) {
+            None | Some("none") => Value::Null,
+            Some(key) => json!(field(find_epic(key, epics)?, "key")),
+        };
+        let kind = args
+            .options
+            .get("type")
+            .map(String::as_str)
+            .unwrap_or("task");
+        let priority = args
+            .options
+            .get("priority")
+            .map(|p| u64::from(p.as_bytes()[0] - b'0'))
+            .unwrap_or(DEFAULT_PRIORITY);
         let mut id = format!("bc-{}", token()?);
         while issues.contains_key(&id) {
             id = format!("bc-{}", token()?);
         }
         let created = now()?;
-        issue=json!({"id":id,"title":args.value,"description":args.get("description"),"acceptance_criteria":args.get("acceptance-criteria"),
-            "state":"open","depends_on":args.dependencies,"claim":null,"notes":[],"created_at":created,"updated_at":created,"revision":1})
+        issue=json!({"id":id,"type":kind,"priority":priority,"epic":epic,"title":args.value,"description":args.get("description"),
+            "acceptance_criteria":args.get("acceptance-criteria"),"state":"open","depends_on":args.dependencies,"claim":null,
+            "notes":[],"created_at":created,"updated_at":created,"revision":1})
             .as_object().unwrap().clone();
     } else {
         issue = issues
@@ -309,14 +486,22 @@ pub fn run(args: &Arguments, root: &Path, issues: &Issues, codec: &dyn Codec) ->
             return Ok(Value::Object(issue));
         }
         let state = field(&issue, "state");
+        let mut target = Value::Null;
         if args.action == "claim" {
-            if state != "open" || !blockers(&issue, issues).is_empty() {
+            if status(&issue, issues) != "ready" {
                 return Err(Failure::new("Issue is not ready", 4));
             }
         } else if ["release", "close"].contains(&args.action.as_str())
             && (state != "claimed" || issue["claim"]["token"].as_str() != Some(args.get("token")))
         {
             return Err(Failure::new("Claim mismatch", 4));
+        } else if args.action == "set-epic" {
+            if args.get("epic") != "none" {
+                target = json!(field(find_epic(args.get("epic"), epics)?, "key"));
+            }
+            if issue["epic"] == target {
+                return Err(Failure::new("Issue epic is unchanged", 4));
+            }
         }
         let revision = issue["revision"].as_u64().unwrap();
         require(revision < MAX_REVISION, "Revision exhausted")?;
@@ -345,6 +530,9 @@ pub fn run(args: &Arguments, root: &Path, issues: &Issues, codec: &dyn Codec) ->
                     }),
                 );
                 issue.insert("claim".into(), Value::Null);
+            }
+            "set-epic" => {
+                issue.insert("epic".into(), target);
             }
             _ => return Err(Failure::new("Unsupported action", 2)),
         }
@@ -407,7 +595,8 @@ pub fn main_entry() -> i32 {
                 store::initialize(&root)?;
             }
             require(store::read_manifest(&root)?, "Store uninitialized")?;
-            run(&args, &root, &store::load(&root, &codec)?, &codec)
+            let (issues, epics) = store::load(&root, &codec)?;
+            run(&args, &root, &issues, &epics, &codec)
         })?;
         writeln!(
             std::io::stdout(),
@@ -458,7 +647,8 @@ mod tests {
             store::initialize(&root)?;
             let execute = |words: &[&str]| -> Result<Value> {
                 let args = parse(&words.iter().map(|s| s.to_string()).collect::<Vec<_>>())?;
-                run(&args, &root, &store::load(&root, &codec)?, &codec)
+                let (issues, epics) = store::load(&root, &codec)?;
+                run(&args, &root, &issues, &epics, &codec)
             };
             let issue = execute(&["--create", "Alternate"])?;
             let id = issue["id"].as_str().unwrap();

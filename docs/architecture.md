@@ -6,12 +6,14 @@ A Beadcrumbs workspace is a directory selected by the caller. It can be a source
 <workspace>/
   .beadcrumbs/
     store.json
+    epics/
+      offline-docs.json
     issues/
       bc-3a3d0744c20a4f35814eb2fc71629888.json
     .writer.lock/                       # transient
 ```
 
-`store.json` identifies the protocol version. Each issue file is authoritative for one issue and its progress notes. Ready lists are derived by scanning the issue directory. A store has no required cache or index. A human can inspect the files with ordinary tools, and an independently implemented client can use the same store by following the [protocol](protocol.md) and [locking rules](concurrency.md).
+`store.json` identifies the protocol version. Each issue file is authoritative for one issue and its progress notes. Each epic file holds one epic's key, title, and description; an issue points to its epic by key. Ready lists are derived by scanning the issue directory. A store has no required cache or index. A human can inspect the files with ordinary tools, and an independently implemented client can use the same store by following the [protocol](protocol.md) and [locking rules](concurrency.md).
 
 ## Lifecycle
 

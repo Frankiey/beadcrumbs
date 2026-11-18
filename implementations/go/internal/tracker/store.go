@@ -153,7 +153,7 @@ func initialize(root string) error {
 		if name == ".writer.lock" {
 			continue
 		}
-		if name == "issues" {
+		if name == "issues" || name == "epics" {
 			if _, err = pathKind(path, true, false); err != nil {
 				return err
 			}
@@ -162,7 +162,7 @@ func initialize(root string) error {
 				return e
 			}
 			if len(children) > 0 {
-				return fmt.Errorf("uninitialized issues not empty")
+				return fmt.Errorf("uninitialized %s not empty", name)
 			}
 		} else if strings.HasPrefix(name, ".tmp-") && tokenRE.MatchString(name[5:]) {
 			if _, err = pathKind(path, false, false); err != nil {
@@ -175,10 +175,54 @@ func initialize(root string) error {
 	if err = mkdir(filepath.Join(root, "issues")); err != nil {
 		return err
 	}
+	if err = mkdir(filepath.Join(root, "epics")); err != nil {
+		return err
+	}
 	data, _ := encode(map[string]any{"format": "beadcrumbs", "version": 1})
 	return publish(filepath.Join(root, "store.json"), data)
 }
-func load(root string, codec Codec) (map[string]*Issue, error) {
+func loadEpics(root string) (map[string]*Epic, error) {
+	directory := filepath.Join(root, "epics")
+	if _, err := pathKind(directory, true, false); err != nil {
+		return nil, err
+	}
+	entries, err := os.ReadDir(directory)
+	if err != nil {
+		return nil, err
+	}
+	epics := map[string]*Epic{}
+	for _, entry := range entries {
+		if !strings.HasSuffix(entry.Name(), ".json") {
+			continue
+		}
+		path := filepath.Join(directory, entry.Name())
+		if _, err = pathKind(path, false, false); err != nil {
+			return nil, err
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return nil, err
+		}
+		epic, err := decodeEpic(data)
+		if err != nil {
+			return nil, err
+		}
+		if entry.Name() != epic.Key+".json" {
+			return nil, fmt.Errorf("epic filename mismatch")
+		}
+		epics[epic.Key] = epic
+	}
+	return epics, nil
+}
+func load(root string, codec Codec) (map[string]*Issue, map[string]*Epic, error) {
+	epics, err := loadEpics(root)
+	if err != nil {
+		return nil, nil, err
+	}
+	issues, err := loadIssues(root, codec, epics)
+	return issues, epics, err
+}
+func loadIssues(root string, codec Codec, epics map[string]*Epic) (map[string]*Issue, error) {
 	directory := filepath.Join(root, "issues")
 	if _, err := pathKind(directory, true, false); err != nil {
 		return nil, err
@@ -207,6 +251,9 @@ func load(root string, codec Codec) (map[string]*Issue, error) {
 		name, err := codec.Filename(issue.ID)
 		if err != nil || name != entry.Name() {
 			return nil, fmt.Errorf("filename mismatch")
+		}
+		if issue.Epic != nil && epics[*issue.Epic] == nil {
+			return nil, fmt.Errorf("missing epic")
 		}
 		issues[issue.ID] = issue
 	}

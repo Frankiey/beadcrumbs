@@ -17,7 +17,8 @@
         "code": 0,
         "result": {
           "valid": true,
-          "issue_count": 0
+          "issue_count": 0,
+          "epic_count": 0
         }
       }
     ]
@@ -27,6 +28,9 @@
     "issues": [
       {
         "id": "bc-00000000000040008000000000000002",
+        "type": "task",
+        "priority": 2,
+        "epic": null,
         "title": "Dependent",
         "description": "",
         "acceptance_criteria": "",
@@ -42,6 +46,9 @@
       },
       {
         "id": "bc-00000000000040008000000000000001",
+        "type": "task",
+        "priority": 2,
+        "epic": null,
         "title": "Prerequisite",
         "description": "",
         "acceptance_criteria": "",
@@ -63,6 +70,9 @@
         "result": [
           {
             "id": "bc-00000000000040008000000000000001",
+            "type": "task",
+            "priority": 2,
+            "epic": null,
             "title": "Prerequisite",
             "description": "",
             "acceptance_criteria": "",
@@ -85,6 +95,9 @@
           {
             "issue": {
               "id": "bc-00000000000040008000000000000002",
+              "type": "task",
+              "priority": 2,
+              "epic": null,
               "title": "Dependent",
               "description": "",
               "acceptance_criteria": "",
@@ -114,6 +127,9 @@
     "issues": [
       {
         "id": "bc-00000000000040008000000000000002",
+        "type": "task",
+        "priority": 2,
+        "epic": null,
         "title": "Dependent",
         "description": "",
         "acceptance_criteria": "",
@@ -142,6 +158,9 @@
     "issues": [
       {
         "id": "bc-00000000000040008000000000000001",
+        "type": "task",
+        "priority": 2,
+        "epic": null,
         "title": "Prerequisite",
         "description": "",
         "acceptance_criteria": "",
@@ -157,6 +176,9 @@
       },
       {
         "id": "bc-00000000000040008000000000000002",
+        "type": "task",
+        "priority": 2,
+        "epic": null,
         "title": "Dependent",
         "description": "",
         "acceptance_criteria": "",
@@ -185,6 +207,9 @@
     "issues": [
       {
         "id": "bc-00000000000040008000000000000001",
+        "type": "task",
+        "priority": 2,
+        "epic": null,
         "title": "Prerequisite",
         "description": "",
         "acceptance_criteria": "",
@@ -219,6 +244,561 @@
       {
         "args": [
           "--init"
+        ],
+        "code": 1
+      }
+    ]
+  },
+  {
+    "name": "epics-types-priority",
+    "epics": [
+      {
+        "key": "auth-rework",
+        "title": "Auth rework",
+        "description": "Replace session cookies.",
+        "created_at": "2026-11-14T00:00:00Z",
+        "updated_at": "2026-11-14T00:00:00Z",
+        "revision": 1
+      }
+    ],
+    "issues": [
+      {
+        "id": "bc-00000000000040008000000000000011",
+        "type": "task",
+        "priority": 4,
+        "epic": null,
+        "title": "Low priority, oldest",
+        "description": "",
+        "acceptance_criteria": "",
+        "state": "open",
+        "depends_on": [],
+        "claim": null,
+        "notes": [],
+        "created_at": "2026-11-13T00:00:00Z",
+        "updated_at": "2026-11-13T00:00:00Z",
+        "revision": 1
+      },
+      {
+        "id": "bc-00000000000040008000000000000012",
+        "type": "bug",
+        "priority": 0,
+        "epic": "auth-rework",
+        "title": "Urgent bug",
+        "description": "",
+        "acceptance_criteria": "",
+        "state": "open",
+        "depends_on": [],
+        "claim": null,
+        "notes": [],
+        "created_at": "2026-11-14T00:00:00Z",
+        "updated_at": "2026-11-14T00:00:00Z",
+        "revision": 1
+      },
+      {
+        "id": "bc-00000000000040008000000000000013",
+        "type": "chore",
+        "priority": 2,
+        "epic": "auth-rework",
+        "title": "Chore",
+        "description": "",
+        "acceptance_criteria": "",
+        "state": "closed",
+        "depends_on": [],
+        "claim": null,
+        "notes": [],
+        "created_at": "2026-11-14T00:00:00Z",
+        "updated_at": "2026-11-14T00:00:00Z",
+        "revision": 1
+      },
+      {
+        "id": "bc-00000000000040008000000000000014",
+        "type": "task",
+        "priority": 1,
+        "epic": "auth-rework",
+        "title": "Waits on bug",
+        "description": "",
+        "acceptance_criteria": "",
+        "state": "open",
+        "depends_on": [
+          "bc-00000000000040008000000000000012"
+        ],
+        "claim": null,
+        "notes": [],
+        "created_at": "2026-11-14T00:00:00Z",
+        "updated_at": "2026-11-14T00:00:00Z",
+        "revision": 1
+      }
+    ],
+    "commands": [
+      {
+        "args": [
+          "--ready"
+        ],
+        "code": 0,
+        "result": [
+          {
+            "id": "bc-00000000000040008000000000000012",
+            "type": "bug",
+            "priority": 0,
+            "epic": "auth-rework",
+            "title": "Urgent bug",
+            "description": "",
+            "acceptance_criteria": "",
+            "state": "open",
+            "depends_on": [],
+            "claim": null,
+            "notes": [],
+            "created_at": "2026-11-14T00:00:00Z",
+            "updated_at": "2026-11-14T00:00:00Z",
+            "revision": 1
+          },
+          {
+            "id": "bc-00000000000040008000000000000011",
+            "type": "task",
+            "priority": 4,
+            "epic": null,
+            "title": "Low priority, oldest",
+            "description": "",
+            "acceptance_criteria": "",
+            "state": "open",
+            "depends_on": [],
+            "claim": null,
+            "notes": [],
+            "created_at": "2026-11-13T00:00:00Z",
+            "updated_at": "2026-11-13T00:00:00Z",
+            "revision": 1
+          }
+        ]
+      },
+      {
+        "args": [
+          "--list"
+        ],
+        "code": 0,
+        "result": [
+          {
+            "id": "bc-00000000000040008000000000000012",
+            "type": "bug",
+            "priority": 0,
+            "epic": "auth-rework",
+            "title": "Urgent bug",
+            "description": "",
+            "acceptance_criteria": "",
+            "state": "open",
+            "depends_on": [],
+            "claim": null,
+            "notes": [],
+            "created_at": "2026-11-14T00:00:00Z",
+            "updated_at": "2026-11-14T00:00:00Z",
+            "revision": 1
+          },
+          {
+            "id": "bc-00000000000040008000000000000014",
+            "type": "task",
+            "priority": 1,
+            "epic": "auth-rework",
+            "title": "Waits on bug",
+            "description": "",
+            "acceptance_criteria": "",
+            "state": "open",
+            "depends_on": [
+              "bc-00000000000040008000000000000012"
+            ],
+            "claim": null,
+            "notes": [],
+            "created_at": "2026-11-14T00:00:00Z",
+            "updated_at": "2026-11-14T00:00:00Z",
+            "revision": 1
+          },
+          {
+            "id": "bc-00000000000040008000000000000013",
+            "type": "chore",
+            "priority": 2,
+            "epic": "auth-rework",
+            "title": "Chore",
+            "description": "",
+            "acceptance_criteria": "",
+            "state": "closed",
+            "depends_on": [],
+            "claim": null,
+            "notes": [],
+            "created_at": "2026-11-14T00:00:00Z",
+            "updated_at": "2026-11-14T00:00:00Z",
+            "revision": 1
+          },
+          {
+            "id": "bc-00000000000040008000000000000011",
+            "type": "task",
+            "priority": 4,
+            "epic": null,
+            "title": "Low priority, oldest",
+            "description": "",
+            "acceptance_criteria": "",
+            "state": "open",
+            "depends_on": [],
+            "claim": null,
+            "notes": [],
+            "created_at": "2026-11-13T00:00:00Z",
+            "updated_at": "2026-11-13T00:00:00Z",
+            "revision": 1
+          }
+        ]
+      },
+      {
+        "args": [
+          "--ready",
+          "--type",
+          "bug"
+        ],
+        "code": 0,
+        "result": [
+          {
+            "id": "bc-00000000000040008000000000000012",
+            "type": "bug",
+            "priority": 0,
+            "epic": "auth-rework",
+            "title": "Urgent bug",
+            "description": "",
+            "acceptance_criteria": "",
+            "state": "open",
+            "depends_on": [],
+            "claim": null,
+            "notes": [],
+            "created_at": "2026-11-14T00:00:00Z",
+            "updated_at": "2026-11-14T00:00:00Z",
+            "revision": 1
+          }
+        ]
+      },
+      {
+        "args": [
+          "--ready",
+          "--epic",
+          "none"
+        ],
+        "code": 0,
+        "result": [
+          {
+            "id": "bc-00000000000040008000000000000011",
+            "type": "task",
+            "priority": 4,
+            "epic": null,
+            "title": "Low priority, oldest",
+            "description": "",
+            "acceptance_criteria": "",
+            "state": "open",
+            "depends_on": [],
+            "claim": null,
+            "notes": [],
+            "created_at": "2026-11-13T00:00:00Z",
+            "updated_at": "2026-11-13T00:00:00Z",
+            "revision": 1
+          }
+        ]
+      },
+      {
+        "args": [
+          "--list",
+          "--epic",
+          "auth-rework",
+          "--state",
+          "closed"
+        ],
+        "code": 0,
+        "result": [
+          {
+            "id": "bc-00000000000040008000000000000013",
+            "type": "chore",
+            "priority": 2,
+            "epic": "auth-rework",
+            "title": "Chore",
+            "description": "",
+            "acceptance_criteria": "",
+            "state": "closed",
+            "depends_on": [],
+            "claim": null,
+            "notes": [],
+            "created_at": "2026-11-14T00:00:00Z",
+            "updated_at": "2026-11-14T00:00:00Z",
+            "revision": 1
+          }
+        ]
+      },
+      {
+        "args": [
+          "--epics"
+        ],
+        "code": 0,
+        "result": [
+          {
+            "key": "auth-rework",
+            "title": "Auth rework",
+            "description": "Replace session cookies.",
+            "created_at": "2026-11-14T00:00:00Z",
+            "updated_at": "2026-11-14T00:00:00Z",
+            "revision": 1
+          }
+        ]
+      },
+      {
+        "args": [
+          "--show-epic",
+          "auth-rework"
+        ],
+        "code": 0,
+        "result": {
+          "epic": {
+            "key": "auth-rework",
+            "title": "Auth rework",
+            "description": "Replace session cookies.",
+            "created_at": "2026-11-14T00:00:00Z",
+            "updated_at": "2026-11-14T00:00:00Z",
+            "revision": 1
+          },
+          "counts": {
+            "ready": 1,
+            "blocked": 1,
+            "claimed": 0,
+            "closed": 1
+          },
+          "issues": [
+            {
+              "id": "bc-00000000000040008000000000000012",
+              "type": "bug",
+              "priority": 0,
+              "epic": "auth-rework",
+              "title": "Urgent bug",
+              "description": "",
+              "acceptance_criteria": "",
+              "state": "open",
+              "depends_on": [],
+              "claim": null,
+              "notes": [],
+              "created_at": "2026-11-14T00:00:00Z",
+              "updated_at": "2026-11-14T00:00:00Z",
+              "revision": 1
+            },
+            {
+              "id": "bc-00000000000040008000000000000014",
+              "type": "task",
+              "priority": 1,
+              "epic": "auth-rework",
+              "title": "Waits on bug",
+              "description": "",
+              "acceptance_criteria": "",
+              "state": "open",
+              "depends_on": [
+                "bc-00000000000040008000000000000012"
+              ],
+              "claim": null,
+              "notes": [],
+              "created_at": "2026-11-14T00:00:00Z",
+              "updated_at": "2026-11-14T00:00:00Z",
+              "revision": 1
+            },
+            {
+              "id": "bc-00000000000040008000000000000013",
+              "type": "chore",
+              "priority": 2,
+              "epic": "auth-rework",
+              "title": "Chore",
+              "description": "",
+              "acceptance_criteria": "",
+              "state": "closed",
+              "depends_on": [],
+              "claim": null,
+              "notes": [],
+              "created_at": "2026-11-14T00:00:00Z",
+              "updated_at": "2026-11-14T00:00:00Z",
+              "revision": 1
+            }
+          ]
+        }
+      },
+      {
+        "args": [
+          "--blocked"
+        ],
+        "code": 0,
+        "result": [
+          {
+            "issue": {
+              "id": "bc-00000000000040008000000000000014",
+              "type": "task",
+              "priority": 1,
+              "epic": "auth-rework",
+              "title": "Waits on bug",
+              "description": "",
+              "acceptance_criteria": "",
+              "state": "open",
+              "depends_on": [
+                "bc-00000000000040008000000000000012"
+              ],
+              "claim": null,
+              "notes": [],
+              "created_at": "2026-11-14T00:00:00Z",
+              "updated_at": "2026-11-14T00:00:00Z",
+              "revision": 1
+            },
+            "blockers": [
+              {
+                "id": "bc-00000000000040008000000000000012",
+                "state": "open"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "args": [
+          "--validate"
+        ],
+        "code": 0,
+        "result": {
+          "valid": true,
+          "issue_count": 4,
+          "epic_count": 1
+        }
+      },
+      {
+        "args": [
+          "--show-epic",
+          "missing"
+        ],
+        "code": 3
+      },
+      {
+        "args": [
+          "--list",
+          "--epic",
+          "missing"
+        ],
+        "code": 3
+      },
+      {
+        "args": [
+          "--ready",
+          "--type",
+          "feature"
+        ],
+        "code": 2
+      }
+    ]
+  },
+  {
+    "name": "missing-epic",
+    "issues": [
+      {
+        "id": "bc-00000000000040008000000000000015",
+        "type": "task",
+        "priority": 2,
+        "epic": "gone",
+        "title": "Orphan",
+        "description": "",
+        "acceptance_criteria": "",
+        "state": "open",
+        "depends_on": [],
+        "claim": null,
+        "notes": [],
+        "created_at": "2026-11-14T00:00:00Z",
+        "updated_at": "2026-11-14T00:00:00Z",
+        "revision": 1
+      }
+    ],
+    "commands": [
+      {
+        "args": [
+          "--validate"
+        ],
+        "code": 1
+      }
+    ]
+  },
+  {
+    "name": "epic-filename-mismatch",
+    "epics": [
+      {
+        "key": "auth-rework",
+        "title": "Auth rework",
+        "description": "Replace session cookies.",
+        "created_at": "2026-11-14T00:00:00Z",
+        "updated_at": "2026-11-14T00:00:00Z",
+        "revision": 1
+      }
+    ],
+    "epic_files": {
+      "other.json": {
+        "key": "auth-rework",
+        "title": "Auth rework",
+        "description": "Replace session cookies.",
+        "created_at": "2026-11-14T00:00:00Z",
+        "updated_at": "2026-11-14T00:00:00Z",
+        "revision": 1
+      }
+    },
+    "issues": [],
+    "commands": [
+      {
+        "args": [
+          "--validate"
+        ],
+        "code": 1
+      }
+    ]
+  },
+  {
+    "name": "invalid-type",
+    "issues": [
+      {
+        "id": "bc-00000000000040008000000000000016",
+        "type": "feature",
+        "priority": 2,
+        "epic": null,
+        "title": "Typed",
+        "description": "",
+        "acceptance_criteria": "",
+        "state": "open",
+        "depends_on": [],
+        "claim": null,
+        "notes": [],
+        "created_at": "2026-11-14T00:00:00Z",
+        "updated_at": "2026-11-14T00:00:00Z",
+        "revision": 1
+      }
+    ],
+    "commands": [
+      {
+        "args": [
+          "--validate"
+        ],
+        "code": 1
+      }
+    ]
+  },
+  {
+    "name": "invalid-priority",
+    "issues": [
+      {
+        "id": "bc-00000000000040008000000000000017",
+        "type": "task",
+        "priority": 5,
+        "epic": null,
+        "title": "Prio",
+        "description": "",
+        "acceptance_criteria": "",
+        "state": "open",
+        "depends_on": [],
+        "claim": null,
+        "notes": [],
+        "created_at": "2026-11-14T00:00:00Z",
+        "updated_at": "2026-11-14T00:00:00Z",
+        "revision": 1
+      }
+    ],
+    "commands": [
+      {
+        "args": [
+          "--validate"
         ],
         "code": 1
       }

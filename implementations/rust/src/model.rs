@@ -32,7 +32,12 @@ impl From<serde_json::Error> for Failure {
 pub type Result<T> = std::result::Result<T, Failure>;
 pub type Issue = Map<String, Value>;
 pub type Issues = BTreeMap<String, Issue>;
+pub type Epic = Map<String, Value>;
+pub type Epics = BTreeMap<String, Epic>;
 pub const MAX_REVISION: u64 = 9_007_199_254_740_991;
+pub const ISSUE_TYPES: &[&str] = &["task", "bug", "chore", "docs", "spike"];
+pub const STATUSES: &[&str] = &["ready", "blocked", "claimed", "closed"];
+pub const DEFAULT_PRIORITY: u64 = 2;
 pub fn require(condition: bool, message: &str) -> Result<()> {
     if condition {
         Ok(())
@@ -66,6 +71,21 @@ pub fn agent_valid(value: &str) -> bool {
         && value
             .bytes()
             .all(|b| b.is_ascii_alphanumeric() || b"._-".contains(&b))
+}
+/// "none" clears an epic; the others are reserved device names on Windows.
+pub fn epic_key_valid(value: &str) -> bool {
+    let bytes = value.as_bytes();
+    let reserved = ["none", "con", "prn", "aux", "nul"].contains(&value)
+        || (bytes.len() == 4
+            && (value.starts_with("com") || value.starts_with("lpt"))
+            && bytes[3].is_ascii_digit());
+    !value.is_empty()
+        && value.len() <= 64
+        && (bytes[0].is_ascii_lowercase() || bytes[0].is_ascii_digit())
+        && bytes
+            .iter()
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || *b == b'-')
+        && !reserved
 }
 pub fn token() -> Result<String> {
     let mut bytes = [0u8; 16];
@@ -156,6 +176,9 @@ pub fn validate(issue: &Issue) -> Result<()> {
         issue,
         &[
             "id",
+            "type",
+            "priority",
+            "epic",
             "title",
             "description",
             "acceptance_criteria",
@@ -170,6 +193,7 @@ pub fn validate(issue: &Issue) -> Result<()> {
     )?;
     for name in [
         "id",
+        "type",
         "title",
         "description",
         "acceptance_criteria",
@@ -182,6 +206,15 @@ pub fn validate(issue: &Issue) -> Result<()> {
     require(
         id_valid(field(issue, "id")) && !field(issue, "title").is_empty(),
         "Invalid ID or title",
+    )?;
+    require(ISSUE_TYPES.contains(&field(issue, "type")), "Invalid type")?;
+    require(
+        issue["priority"].as_u64().is_some_and(|n| n <= 4),
+        "Invalid priority",
+    )?;
+    require(
+        issue["epic"].is_null() || issue["epic"].as_str().is_some_and(epic_key_valid),
+        "Invalid epic key",
     )?;
     let state = field(issue, "state");
     require(
@@ -234,6 +267,36 @@ pub fn validate(issue: &Issue) -> Result<()> {
         "Invalid revision",
     )
 }
+pub fn validate_epic(epic: &Epic) -> Result<()> {
+    exact(
+        epic,
+        &[
+            "key",
+            "title",
+            "description",
+            "created_at",
+            "updated_at",
+            "revision",
+        ],
+    )?;
+    for name in ["key", "title", "description", "created_at", "updated_at"] {
+        text(&epic[name])?;
+    }
+    require(
+        epic_key_valid(field(epic, "key")) && !field(epic, "title").is_empty(),
+        "Invalid epic key or title",
+    )?;
+    require(
+        timestamp(field(epic, "created_at")) && timestamp(field(epic, "updated_at")),
+        "Invalid timestamp",
+    )?;
+    require(
+        epic["revision"]
+            .as_u64()
+            .is_some_and(|n| (1..=MAX_REVISION).contains(&n)),
+        "Invalid revision",
+    )
+}
 pub fn dependencies(issue: &Issue) -> Vec<&str> {
     issue["depends_on"]
         .as_array()
@@ -251,8 +314,22 @@ pub fn blockers(issue: &Issue, issues: &Issues) -> Vec<Value> {
 }
 pub fn ordered(issues: &Issues) -> Vec<&Issue> {
     let mut rows: Vec<_> = issues.values().collect();
-    rows.sort_by_key(|issue| (field(issue, "created_at"), field(issue, "id")));
+    rows.sort_by_key(|issue| {
+        (
+            issue["priority"].as_u64().unwrap(),
+            field(issue, "created_at"),
+            field(issue, "id"),
+        )
+    });
     rows
+}
+pub fn status(issue: &Issue, issues: &Issues) -> &'static str {
+    match field(issue, "state") {
+        "open" if blockers(issue, issues).is_empty() => "ready",
+        "open" => "blocked",
+        "claimed" => "claimed",
+        _ => "closed",
+    }
 }
 pub fn validate_graph(issues: &Issues) -> Result<()> {
     let mut counts = HashMap::new();

@@ -163,7 +163,7 @@ class CodecBoundaryTests(unittest.TestCase):
                 snapshot = client.load_issues(root, codec)
                 before = json.dumps(snapshot, sort_keys=True)
                 rendered = client.render_board(list(snapshot.values()), snapshot, "2026-11-14T00:00:00Z")
-                self.assertIn("## Closed (1)", rendered)
+                self.assertIn("| closed | " + issue["id"], rendered)
                 self.assertEqual(json.dumps(snapshot, sort_keys=True), before)
                 self.assertEqual(sorted(p.suffix for p in (root / "issues").iterdir()), [".example"])
 

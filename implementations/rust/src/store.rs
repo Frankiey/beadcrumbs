@@ -136,11 +136,11 @@ pub fn initialize(root: &Path) -> Result<()> {
         if name == ".writer.lock" {
             continue;
         }
-        if name == "issues" {
+        if name == "issues" || name == "epics" {
             path_kind(&path, true, false)?;
             require(
                 fs::read_dir(&path)?.next().is_none(),
-                "Uninitialized issues directory is not empty",
+                "Uninitialized directory is not empty",
             )?;
         } else if name.strip_prefix(".tmp-").is_some_and(token_valid) {
             path_kind(&path, false, false)?;
@@ -149,12 +149,53 @@ pub fn initialize(root: &Path) -> Result<()> {
         }
     }
     mkdir(&root.join("issues"))?;
+    mkdir(&root.join("epics"))?;
     publish(
         &root.join("store.json"),
         &encode_json(&json!({"format":"beadcrumbs","version":1}))?,
     )
 }
-pub fn load(root: &Path, codec: &dyn Codec) -> Result<Issues> {
+fn sorted_entries(directory: &Path) -> Result<Vec<PathBuf>> {
+    path_kind(directory, true, false)?;
+    let mut paths: Vec<PathBuf> = fs::read_dir(directory)?
+        .map(|e| e.map(|entry| entry.path()))
+        .collect::<std::io::Result<_>>()?;
+    paths.sort();
+    Ok(paths)
+}
+pub fn load_epics(root: &Path) -> Result<Epics> {
+    let mut epics = Epics::new();
+    for path in sorted_entries(&root.join("epics"))? {
+        let name = path
+            .file_name()
+            .and_then(|s| s.to_str())
+            .ok_or_else(|| Failure::new("Invalid path", 1))?;
+        if !name.ends_with(".json") {
+            continue;
+        }
+        path_kind(&path, false, false)?;
+        let epic = decode_json(&fs::read(&path)?)?
+            .as_object()
+            .cloned()
+            .ok_or_else(|| Failure::new("Expected epic object", 1))?;
+        validate_epic(&epic)?;
+        let key = field(&epic, "key").to_string();
+        require(name == format!("{key}.json"), "Epic filename mismatch")?;
+        epics.insert(key, epic);
+    }
+    Ok(epics)
+}
+pub fn save_epic(root: &Path, epic: &Epic) -> Result<()> {
+    validate_epic(epic)?;
+    publish(
+        &root
+            .join("epics")
+            .join(format!("{}.json", field(epic, "key"))),
+        &encode_json(&Value::Object(epic.clone()))?,
+    )
+}
+pub fn load(root: &Path, codec: &dyn Codec) -> Result<(Issues, Epics)> {
+    let epics = load_epics(root)?;
     let directory = root.join("issues");
     path_kind(&directory, true, false)?;
     let mut paths: Vec<PathBuf> = fs::read_dir(directory)?
@@ -175,10 +216,16 @@ pub fn load(root: &Path, codec: &dyn Codec) -> Result<Issues> {
         validate(&issue)?;
         let id = field(&issue, "id").to_string();
         require(name == codec.filename(&id)?, "Filename mismatch")?;
+        require(
+            issue["epic"]
+                .as_str()
+                .is_none_or(|key| epics.contains_key(key)),
+            "Missing epic",
+        )?;
         issues.insert(id, issue);
     }
     validate_graph(&issues)?;
-    Ok(issues)
+    Ok((issues, epics))
 }
 pub fn save(root: &Path, issue: &Issue, codec: &dyn Codec) -> Result<()> {
     validate(issue)?;

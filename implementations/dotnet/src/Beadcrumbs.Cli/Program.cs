@@ -25,7 +25,8 @@ try
     {
         if (arguments.Action == "init") Store.Initialize(root);
         Model.Require(Store.ReadManifest(root), "Store uninitialized");
-        return Commands.Run(arguments, root, Store.Load(root, codec), codec);
+        var epics = Store.LoadEpics(root);
+        return Commands.Run(arguments, root, Store.Load(root, codec, epics), epics, codec);
     });
     Console.WriteLine(result.ToJsonString(arguments.Options.ContainsKey("json") ? null : Model.Pretty));
     return 0;

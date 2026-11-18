@@ -1,5 +1,5 @@
-import { blockers, orderedIssues } from "./model.js";
-import type { Issue } from "./model.js";
+import { blockers, compareText, orderedIssues, status, statuses } from "./model.js";
+import type { Epic, Issue } from "./model.js";
 
 function cell(value: string): string {
   let result = "";
@@ -13,22 +13,37 @@ function cell(value: string): string {
   return result;
 }
 
-export function renderBoard(issues: Map<string, Issue>, generated: string): string {
-  const sections = new Map<string, string[]>([["Ready", []], ["Blocked", []], ["Claimed", []], ["Closed", []]]);
-  for (const issue of orderedIssues(issues)) {
-    const unresolved = blockers(issue, issues);
-    let section = issue.state === "claimed" ? "Claimed" : "Closed";
-    if (issue.state === "open") section = unresolved.length ? "Blocked" : "Ready";
-    const columns = [issue.id, issue.title, issue.claim?.agent ?? "—",
-      unresolved.map(item => item.id + " (" + item.state + ")").join(", ") || "—"];
-    sections.get(section)!.push("| " + columns.map(cell).join(" | ") + " |");
-  }
+export function renderBoard(issues: Map<string, Issue>, generated: string,
+  epics: Map<string, Epic> = new Map()): string {
+  const groups = new Map<string | null, Issue[]>();
+  for (const key of [...epics.keys()].sort(compareText)) groups.set(key, []);
+  groups.set(null, []);
+  for (const issue of orderedIssues(issues)) groups.get(issue.epic)!.push(issue);
+  const name = (key: string | null): string => key === null ? "No epic" : cell(epics.get(key)!.title) + " (" + key + ")";
   const lines = ["# Beadcrumbs board", "", "Generated at " + generated + ".", "",
-    "Snapshot of the issue store. Regenerate with --board. Manual edits are replaced.", ""];
-  for (const [name, rows] of sections) {
-    lines.push("## " + name + " (" + rows.length + ")", "");
-    if (rows.length) lines.push("| ID | Title | Agent | Blockers |", "| --- | --- | --- | --- |", ...rows, "");
-    else lines.push("No issues.", "");
+    "Snapshot of the issue store. Regenerate with --board. Manual edits are replaced.", "",
+    "## Summary", "", "| Epic | Ready | Blocked | Claimed | Closed |", "| --- | --- | --- | --- | --- |"];
+  for (const [key, members] of groups) {
+    const counts = statuses.map(state => members.filter(issue => status(issue, issues) === state).length);
+    lines.push("| " + name(key) + " | " + counts.join(" | ") + " |");
+  }
+  lines.push("");
+  for (const [key, members] of groups) {
+    lines.push("## " + name(key), "");
+    if (!members.length) {
+      lines.push("No issues.", "");
+      continue;
+    }
+    lines.push("| Status | ID | Type | Priority | Title | Agent | Blockers |",
+      "| --- | --- | --- | --- | --- | --- | --- |");
+    const rank = (issue: Issue): number => statuses.indexOf(status(issue, issues));
+    for (const issue of [...members].sort((a, b) => rank(a) - rank(b))) {
+      const columns = [status(issue, issues), issue.id, issue.type, "P" + issue.priority, issue.title,
+        issue.claim?.agent ?? "—",
+        blockers(issue, issues).map(item => item.id + " (" + item.state + ")").join(", ") || "—"];
+      lines.push("| " + columns.map(cell).join(" | ") + " |");
+    }
+    lines.push("");
   }
   return lines.join("\n");
 }

@@ -13,6 +13,14 @@ export function requireValue(condition: unknown, message: string): asserts condi
 export const tokenPattern = /[0-9a-f]{12}4[0-9a-f]{3}[89ab][0-9a-f]{15}/;
 export const idPattern = /bc-[0-9a-f]{12}4[0-9a-f]{3}[89ab][0-9a-f]{15}/;
 export const agentPattern = /[A-Za-z0-9][A-Za-z0-9._-]{0,63}/;
+export const epicPattern = /[a-z0-9][a-z0-9-]{0,63}/;
+// "none" clears an epic; the others are reserved device names on Windows.
+const reservedEpics = new Set(["none", "con", "prn", "aux", "nul",
+  ...[..."0123456789"].flatMap(n => ["com" + n, "lpt" + n])]);
+export const issueTypes = ["task", "bug", "chore", "docs", "spike"] as const;
+export const defaultPriority = 2;
+export const statuses = ["ready", "blocked", "claimed", "closed"] as const;
+export type Status = typeof statuses[number];
 export const maxRevision = Number.MAX_SAFE_INTEGER;
 export const manifest = { format: "beadcrumbs", version: 1 } as const;
 
@@ -39,11 +47,18 @@ export function timestamp(value: unknown): asserts value is string {
     time.toISOString().replace(".000Z", "Z") === value, "Invalid calendar timestamp");
 }
 
+export function epicKey(value: unknown): value is string {
+  return matches(epicPattern, value) && !reservedEpics.has(value);
+}
+
 export type State = "open" | "claimed" | "closed";
 export interface Claim { agent: string; token: string }
 export interface Note { at: string; by: string; text: string }
 export interface Issue {
   id: string;
+  type: string;
+  priority: number;
+  epic: string | null;
   title: string;
   description: string;
   acceptance_criteria: string;
@@ -57,9 +72,14 @@ export interface Issue {
 }
 
 export function validateIssue(value: unknown): asserts value is Issue {
-  objectFields(value, ["id", "title", "description", "acceptance_criteria", "state",
+  objectFields(value, ["id", "type", "priority", "epic", "title", "description", "acceptance_criteria", "state",
     "depends_on", "claim", "notes", "created_at", "updated_at", "revision"]);
   requireValue(matches(idPattern, value.id), "Invalid issue ID");
+  requireValue(typeof value.type === "string" && (issueTypes as readonly string[]).includes(value.type),
+    "Invalid issue type");
+  requireValue(typeof value.priority === "number" && Number.isInteger(value.priority) &&
+    value.priority >= 0 && value.priority <= 4, "Invalid priority");
+  requireValue(value.epic === null || epicKey(value.epic), "Invalid epic key");
   textValue(value.title, true);
   textValue(value.description);
   textValue(value.acceptance_criteria);
@@ -82,6 +102,26 @@ export function validateIssue(value: unknown): asserts value is Issue {
     requireValue(matches(agentPattern, note.by), "Invalid note author");
     textValue(note.text, true);
   }
+  timestamp(value.created_at);
+  timestamp(value.updated_at);
+  requireValue(typeof value.revision === "number" && Number.isSafeInteger(value.revision) &&
+    value.revision >= 1, "Invalid revision");
+}
+
+export interface Epic {
+  key: string;
+  title: string;
+  description: string;
+  created_at: string;
+  updated_at: string;
+  revision: number;
+}
+
+export function validateEpic(value: unknown): asserts value is Epic {
+  objectFields(value, ["key", "title", "description", "created_at", "updated_at", "revision"]);
+  requireValue(epicKey(value.key), "Invalid epic key");
+  textValue(value.title, true);
+  textValue(value.description);
   timestamp(value.created_at);
   timestamp(value.updated_at);
   requireValue(typeof value.revision === "number" && Number.isSafeInteger(value.revision) &&
@@ -118,7 +158,14 @@ export function blockers(issue: Issue, issues: Map<string, Issue>): {id: string;
     .map(id => ({ id, state: issues.get(id)!.state }));
 }
 
+export function status(issue: Issue, issues: Map<string, Issue>): Status {
+  if (issue.state === "open") return blockers(issue, issues).length ? "blocked" : "ready";
+  return issue.state;
+}
+
+export function compareText(a: string, b: string): number { return a < b ? -1 : a > b ? 1 : 0; }
+
 export function orderedIssues(issues: Map<string, Issue>): Issue[] {
-  const compare = (a: string, b: string): number => a < b ? -1 : a > b ? 1 : 0;
-  return [...issues.values()].sort((a, b) => compare(a.created_at, b.created_at) || compare(a.id, b.id));
+  return [...issues.values()].sort((a, b) => a.priority - b.priority ||
+    compareText(a.created_at, b.created_at) || compareText(a.id, b.id));
 }
