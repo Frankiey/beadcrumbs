@@ -3,6 +3,7 @@
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -13,9 +14,10 @@ HERE = Path(__file__).resolve().parent
 CLI = HERE.parent / "beadcrumbs.py"
 
 
-def check(condition, message):
+def check(condition, message, **details):
     if not condition:
-        raise RuntimeError(message)
+        shown = "; ".join(f"{key}={value!r}" for key, value in details.items())
+        raise RuntimeError(f"{message} ({shown})" if shown else message)
 
 
 def run_scenario(workspace, transcript, setup_only):
@@ -52,7 +54,9 @@ def run_scenario(workspace, transcript, setup_only):
 
     call("--init")
     brief = workspace / "brief.md"
-    brief.write_text("Document the offline setup.\nVerify Unicode survives — café.\n", encoding="utf-8")
+    # Write bytes so the brief has LF endings on every platform; write_text would use CRLF on Windows.
+    brief_text = "Document the offline setup.\nVerify Unicode survives — café.\n"
+    brief.write_bytes(brief_text.encode("utf-8"))
     first = call(
         "--create",
         "Document offline setup",
@@ -62,7 +66,7 @@ def run_scenario(workspace, transcript, setup_only):
         "A new worker can run the documented steps.",
     )
     second = call("--create", "Verify the setup guide", "--depends-on", first["id"])
-    check(first["description"] == brief.read_text(encoding="utf-8"), "Brief changed")
+    check(first["description"] == brief_text, "Brief changed", expected=brief_text, actual=first["description"])
     check(call("--ready") == [first], "Unexpected initial ready list")
     check(
         call("--blocked")
@@ -128,6 +132,11 @@ def main():
     (run / "summary.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(summary, indent=2))
     print(f"Command transcript: {run / 'commands.jsonl'}")
+    if summary["status"] != "passed" and os.environ.get("GITHUB_ACTIONS"):
+        # Temporary CI diagnostics: show the last commands, since run directories are not uploaded.
+        lines = (run / "commands.jsonl").read_text(encoding="utf-8").splitlines()
+        print("Last commands:")
+        print("\n".join(lines[-5:]))
     return 0 if summary["status"] == "passed" else 1
 
 
