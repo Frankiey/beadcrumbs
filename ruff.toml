@@ -1,0 +1,24 @@
+# Lint and format settings for the Python reference client, tests, and scripts.
+# Ruff is a development tool only; beadcrumbs.py stays standard-library only.
+target-version = "py310"
+line-length = 120
+extend-exclude = ["implementations", "integration/.runs"]
+
+[lint]
+select = [
+  "E",    # pycodestyle errors
+  "W",    # pycodestyle warnings
+  "F",    # pyflakes
+  "I",    # import sorting
+  "B",    # bugbear
+  "UP",   # pyupgrade (to 3.10)
+  "SIM",  # simplifications
+  "C4",   # comprehensions
+  "RUF",  # ruff-specific
+  "EXE",  # shebangs match file modes
+]
+ignore = [
+  "C408",    # dict(key=...) reads well for issue records
+  "RUF005",  # list concatenation is clear for argv building
+  "SIM102",  # nested ifs inside if/elif chains keep branch semantics explicit
+]

@@ -1,12 +1,12 @@
 """Reference-client fault injection, independent of the portable CLI suite."""
+
 import importlib.util
 import json
-import os
-from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -21,9 +21,8 @@ class PublicationTests(unittest.TestCase):
             with self.subTest(failure=failure), tempfile.TemporaryDirectory() as folder:
                 path = Path(folder) / "record.json"
                 path.write_text('{"old":true}\n')
-                with patch.object(client.os, failure, side_effect=OSError("injected")):
-                    with self.assertRaises(OSError):
-                        client.publish(path, {"new": True})
+                with patch.object(client.os, failure, side_effect=OSError("injected")), self.assertRaises(OSError):
+                    client.publish(path, {"new": True})
                 self.assertEqual(json.loads(path.read_text()), {"old": True})
                 self.assertEqual([p.name for p in path.parent.iterdir()], ["record.json"])
 
@@ -43,11 +42,15 @@ module["main"](["--claim", sys.argv[3], "--agent", "worker", "--json"])
             with self.subTest(phase=phase), tempfile.TemporaryDirectory() as folder:
                 command = [sys.executable, str(ROOT / "beadcrumbs.py")]
                 subprocess.run(command + ["--init"], cwd=folder, check=True, capture_output=True)
-                created = subprocess.run(command + ["--create", "Task", "--json"], cwd=folder,
-                                         check=True, capture_output=True, text=True)
+                created = subprocess.run(
+                    command + ["--create", "Task", "--json"], cwd=folder, check=True, capture_output=True, text=True
+                )
                 issue = json.loads(created.stdout)
-                result = subprocess.run([sys.executable, "-c", script, str(ROOT / "beadcrumbs.py"),
-                                         phase, issue["id"]], cwd=folder, capture_output=True)
+                result = subprocess.run(
+                    [sys.executable, "-c", script, str(ROOT / "beadcrumbs.py"), phase, issue["id"]],
+                    cwd=folder,
+                    capture_output=True,
+                )
                 self.assertEqual(result.returncode, 77, result.stderr)
                 store = Path(folder) / ".beadcrumbs"
                 record = json.loads((store / "issues" / (issue["id"] + ".json")).read_text())
@@ -82,8 +85,9 @@ assert call(["--ready"])[0]["id"] == b["id"]
 assert call(["--validate"])["issue_count"] == 2
 """
         with tempfile.TemporaryDirectory() as folder:
-            result = subprocess.run([sys.executable, "-c", script, str(ROOT / "beadcrumbs.py")],
-                                    cwd=folder, capture_output=True, text=True)
+            result = subprocess.run(
+                [sys.executable, "-c", script, str(ROOT / "beadcrumbs.py")], cwd=folder, capture_output=True, text=True
+            )
             self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_schema_examples_and_lexical_integer_rules(self):
@@ -96,7 +100,7 @@ assert call(["--validate"])["issue_count"] == 2
             root = Path(folder)
             path = root / "store.json"
             for value in ("1.0", "1e0", "true"):
-                path.write_text('{"format":"beadcrumbs","version":' + value + '}')
+                path.write_text('{"format":"beadcrumbs","version":' + value + "}")
                 with self.assertRaises(client.Failure):
                     client.read_manifest(root)
 
@@ -123,9 +127,11 @@ class CodecBoundaryTests(unittest.TestCase):
             root = Path(folder) / ".beadcrumbs"
             with client.store_lock(root, True):
                 client.initialize_store(root)
+
                 def execute(*args):
                     parsed = client.parse_args(list(args))
                     return client.run_action(parsed, root, client.load_issues(root, codec), codec)
+
                 issue = execute("--create", "Alternate format", "--description", "λ\ntext")
                 path = root / "issues" / codec.filename(issue["id"])
                 self.assertTrue(path.read_bytes().startswith(b"example-v1\n"))
@@ -147,7 +153,7 @@ class CodecBoundaryTests(unittest.TestCase):
         codec = client.JsonIssueCodec()
         value = {"text": "Unicode λ\n", "number": 1, "empty": None}
         self.assertEqual(codec.decode(codec.encode(value)), value)
-        for payload in (b'{"x":1,"x":2}', b'{"x":NaN}', b'\xff'):
+        for payload in (b'{"x":1,"x":2}', b'{"x":NaN}', b"\xff"):
             with self.subTest(payload=payload), self.assertRaises(client.Failure):
                 codec.decode(payload)
         with self.assertRaises(client.Failure):

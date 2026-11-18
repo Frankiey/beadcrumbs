@@ -42,7 +42,7 @@ sealed class ExampleCodec : IIssueCodec
 {
     public bool Accepts(string name) => name.EndsWith(".example", StringComparison.Ordinal);
     public string Filename(string id) => id + ".example";
-    public byte[] Encode(JsonObject issue) => [..Model.Utf8.GetBytes("example\n"), ..JsonWire.Encode(issue)];
+    public byte[] Encode(JsonObject issue) => [.. Model.Utf8.GetBytes("example\n"), .. JsonWire.Encode(issue)];
     public JsonObject Decode(byte[] bytes)
     {
         if (Model.Utf8.GetString(bytes[..8]) != "example\n") throw new Failure("Invalid example bytes");

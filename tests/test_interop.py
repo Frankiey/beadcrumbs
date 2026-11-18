@@ -1,14 +1,17 @@
 """Cross-client tests. Set BEADCRUMBS_PEER_COMMAND to a JSON argv array."""
+
 import json
 import os
-from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import unittest
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-PRIMARY = json.loads(os.environ.get("BEADCRUMBS_PRIMARY_COMMAND", json.dumps([sys.executable, str(ROOT / "beadcrumbs.py")])))
+PRIMARY = json.loads(
+    os.environ.get("BEADCRUMBS_PRIMARY_COMMAND", json.dumps([sys.executable, str(ROOT / "beadcrumbs.py")]))
+)
 PEER = json.loads(os.environ.get("BEADCRUMBS_PEER_COMMAND", "null"))
 
 
@@ -20,8 +23,9 @@ class InteroperabilityTests(unittest.TestCase):
         self.workspace = Path(self.temp.name)
 
     def call(self, client, *args, code=0):
-        result = subprocess.run(client + list(args) + ["--json"], cwd=self.workspace,
-                                capture_output=True, text=True, timeout=30)
+        result = subprocess.run(
+            client + list(args) + ["--json"], cwd=self.workspace, capture_output=True, text=True, timeout=30
+        )
         self.assertEqual(result.returncode, code, result.stderr)
         if code:
             self.assertEqual(result.stdout, "")
@@ -48,16 +52,23 @@ class InteroperabilityTests(unittest.TestCase):
         first_board = (self.workspace / "board.md").read_text().splitlines()
         self.call(PRIMARY, "--board")
         second_board = (self.workspace / "board.md").read_text().splitlines()
-        self.assertEqual([line for line in first_board if not line.startswith("Generated at ")],
-                         [line for line in second_board if not line.startswith("Generated at ")])
+        self.assertEqual(
+            [line for line in first_board if not line.startswith("Generated at ")],
+            [line for line in second_board if not line.startswith("Generated at ")],
+        )
         self.assertEqual(self.call(PEER, "--validate")["issue_count"], 2)
 
     def test_mixed_client_claim_race(self):
         self.call(PEER, "--init")
         issue = self.call(PEER, "--create", "Shared race")
         processes = [
-            subprocess.Popen(client + ["--claim", issue["id"], "--agent", f"worker-{index}", "--json"],
-                             cwd=self.workspace, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            subprocess.Popen(
+                client + ["--claim", issue["id"], "--agent", f"worker-{index}", "--json"],
+                cwd=self.workspace,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
             for index, client in enumerate([PRIMARY, PEER] * 4)
         ]
         winners = []

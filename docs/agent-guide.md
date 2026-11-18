@@ -94,11 +94,11 @@ Or in Python, for an orchestrator that drives the CLI:
 ```python
 import json, subprocess, time
 
+
 def bc(*args, retries=10):
     delay = 0.1
     for _ in range(retries):
-        p = subprocess.run(["python3", "beadcrumbs.py", *args, "--json"],
-                           capture_output=True, text=True)
+        p = subprocess.run(["python3", "beadcrumbs.py", *args, "--json"], capture_output=True, text=True)
         if p.returncode != 5:
             if p.returncode != 0:
                 raise RuntimeError(f"exit {p.returncode}: {p.stderr.strip()}")
@@ -106,6 +106,7 @@ def bc(*args, retries=10):
         time.sleep(delay)
         delay = min(delay * 2, 2.0)
     raise TimeoutError("beadcrumbs store stayed busy")
+
 
 issue = next(iter(bc("--ready")), None)
 if issue:
