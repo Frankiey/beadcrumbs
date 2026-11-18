@@ -105,6 +105,24 @@ assert call(["--validate"])["issue_count"] == 2
                     client.read_manifest(root)
 
 
+class LockTests(unittest.TestCase):
+    def test_lock_removed_after_failed_creation_is_busy(self):
+        # Another process can release the lock between our failed mkdir and the follow-up inspection.
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder) / ".beadcrumbs"
+            root.mkdir()
+            with client.store_lock(root, True):
+                client.initialize_store(root)
+            with (
+                patch.object(Path, "mkdir", side_effect=FileExistsError),
+                self.assertRaises(client.Failure) as caught,
+                client.store_lock(root, False),
+            ):
+                self.fail("lock acquired")
+            self.assertEqual(caught.exception.code, 5)
+            self.assertFalse((root / ".writer.lock").exists())
+
+
 class CodecBoundaryTests(unittest.TestCase):
     def test_alternate_codec_runs_existing_lifecycle(self):
         class ExampleCodec:

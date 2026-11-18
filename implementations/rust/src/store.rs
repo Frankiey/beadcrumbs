@@ -113,7 +113,8 @@ pub fn locked<T>(root: &Path, initialize: bool, action: impl FnOnce() -> Result<
     match builder.create(&lock) {
         Ok(()) => (),
         Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
-            path_kind(&lock, true, false)?;
+            // The holder may remove the lock before we inspect it; that is still busy.
+            path_kind(&lock, true, true)?;
             return Err(Failure::new("Store busy", 5));
         }
         Err(error) => return Err(error.into()),

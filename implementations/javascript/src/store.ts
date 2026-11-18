@@ -73,7 +73,8 @@ export function withStoreLock<T>(root: string, initialize: boolean, operation: (
     fs.mkdirSync(lock, { mode: 0o700 });
   } catch (error) {
     if (!isErrorCode(error, "EEXIST")) throw error;
-    pathKind(lock, true);
+    // The holder may remove the lock before we inspect it; that is still busy.
+    pathKind(lock, true, true);
     throw new Failure("Store is busy", 5);
   }
   try { return operation(); } finally { fs.rmdirSync(lock); }

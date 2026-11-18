@@ -49,7 +49,8 @@ public static class Store
         int code = Marshal.GetLastPInvokeError();
         if (code == (OperatingSystem.IsWindows() ? 183 : 17))
         {
-            PathKind(path, true);
+            // The holder may remove the lock before we inspect it; that is still busy.
+            PathKind(path, true, true);
             throw new Failure("Store is busy", 5);
         }
         throw new IOException("Cannot create lock, OS error " + code);

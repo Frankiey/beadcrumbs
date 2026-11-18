@@ -258,8 +258,9 @@ def store_lock(root, initialize):
     try:
         lock.mkdir(mode=0o700)
     except FileExistsError:
+        # The holder may remove the lock before we inspect it; that is still busy.
         try:
-            path_kind(lock, directory=True)
+            path_kind(lock, directory=True, optional=True)
         except PermissionError:
             if not lock_pending_removal(lock):
                 raise
