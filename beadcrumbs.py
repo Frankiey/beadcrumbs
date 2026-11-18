@@ -2,18 +2,19 @@
 # Copyright 2026 Frankiey
 # SPDX-License-Identifier: Apache-2.0
 """Offline, filesystem-native issue tracking. Python 3.10+, standard library."""
+
 import argparse
-from collections import deque
-from contextlib import contextmanager
-from datetime import datetime, timezone
 import json
-import unicodedata
 import os
-from pathlib import Path
 import re
 import stat
 import sys
+import unicodedata
 import uuid
+from collections import deque
+from contextlib import contextmanager
+from datetime import datetime, timezone
+from pathlib import Path
 
 VERSION = "0.1.0"
 MANIFEST = {"format": "beadcrumbs", "version": 1}
@@ -22,8 +23,19 @@ ID = "bc-" + TOKEN
 AGENT = r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}"
 TIME = r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z"
 MAX_REVISION = 9007199254740991
-FIELDS = {"id", "title", "description", "acceptance_criteria", "state",
-          "depends_on", "claim", "notes", "created_at", "updated_at", "revision"}
+FIELDS = {
+    "id",
+    "title",
+    "description",
+    "acceptance_criteria",
+    "state",
+    "depends_on",
+    "claim",
+    "notes",
+    "created_at",
+    "updated_at",
+    "revision",
+}
 
 
 class Failure(Exception):
@@ -44,8 +56,7 @@ def matches(pattern, value):
 def text_value(value, nonempty=False):
     require(isinstance(value, str), "Expected text")
     require(not nonempty or bool(value), "Text must be nonempty")
-    require(not any(0xD800 <= ord(char) <= 0xDFFF for char in value),
-            "Unpaired Unicode surrogate")
+    require(not any(0xD800 <= ord(char) <= 0xDFFF for char in value), "Unpaired Unicode surrogate")
 
 
 def object_fields(value, fields):
@@ -66,10 +77,11 @@ def path_kind(path, directory=False, optional=False):
     except FileNotFoundError:
         if optional:
             return False
-        raise Failure(f"Missing path: {path}")
-    require(not stat.S_ISLNK(info.st_mode) and
-            not (getattr(info, "st_file_attributes", 0) & 0x400),
-            f"Linked protocol path: {path}")
+        raise Failure(f"Missing path: {path}") from None
+    require(
+        not stat.S_ISLNK(info.st_mode) and not (getattr(info, "st_file_attributes", 0) & 0x400),
+        f"Linked protocol path: {path}",
+    )
     predicate = stat.S_ISDIR if directory else stat.S_ISREG
     require(predicate(info.st_mode), f"Unexpected path type: {path}")
     return True
@@ -90,8 +102,7 @@ def invalid_constant(value):
 
 def decode_json(payload):
     try:
-        return json.loads(payload.decode("utf-8"), object_pairs_hook=unique_object,
-                          parse_constant=invalid_constant)
+        return json.loads(payload.decode("utf-8"), object_pairs_hook=unique_object, parse_constant=invalid_constant)
     except (ValueError, UnicodeError) as error:
         raise Failure(f"Invalid JSON: {error}") from error
 
@@ -132,8 +143,7 @@ def read_manifest(root):
     value = read_json(path)
     require(isinstance(value, dict), "Invalid manifest")
     require(value.get("format") == "beadcrumbs", "Unsupported store format")
-    require(type(value.get("version")) is int and value["version"] == 1,
-            "Unsupported store version")
+    require(type(value.get("version")) is int and value["version"] == 1, "Unsupported store version")
     object_fields(value, {"format", "version"})
     return True
 
@@ -145,8 +155,7 @@ def validate_issue(issue):
         text_value(issue[field], nonempty=field == "title")
     require(issue["state"] in ("open", "claimed", "closed"), "Invalid issue state")
     dependencies = issue["depends_on"]
-    require(isinstance(dependencies, list) and
-            all(matches(ID, dep) for dep in dependencies), "Invalid dependencies")
+    require(isinstance(dependencies, list) and all(matches(ID, dep) for dep in dependencies), "Invalid dependencies")
     require(len(set(dependencies)) == len(dependencies), "Duplicate dependency")
     if issue["state"] == "claimed":
         object_fields(issue["claim"], {"agent", "token"})
@@ -162,8 +171,7 @@ def validate_issue(issue):
         text_value(note["text"], nonempty=True)
     timestamp(issue["created_at"])
     timestamp(issue["updated_at"])
-    require(type(issue["revision"]) is int and
-            1 <= issue["revision"] <= MAX_REVISION, "Invalid revision")
+    require(type(issue["revision"]) is int and 1 <= issue["revision"] <= MAX_REVISION, "Invalid revision")
 
 
 def load_issues(root, codec=ISSUE_CODEC):
@@ -183,8 +191,10 @@ def load_issues(root, codec=ISSUE_CODEC):
         indegree[key] = len(issue["depends_on"])
         for dep in issue["depends_on"]:
             require(dep in issues, f"Missing dependency: {dep}")
-            require(issue["state"] == "open" or issues[dep]["state"] == "closed",
-                    "Claimed or closed issue has an unresolved dependency")
+            require(
+                issue["state"] == "open" or issues[dep]["state"] == "closed",
+                "Claimed or closed issue has an unresolved dependency",
+            )
             dependents[dep].append(key)
     queue = deque(key for key, count in indegree.items() if count == 0)
     visited = 0
@@ -215,6 +225,19 @@ def publish_bytes(path, payload):
         scratch.unlink(missing_ok=True)
 
 
+def lock_pending_removal(lock):
+    """Windows denies access to a directory while another process is still removing it."""
+    if os.name != "nt":
+        return False
+    try:
+        lock.lstat()
+    except PermissionError:
+        return True
+    except FileNotFoundError:
+        return False
+    return True
+
+
 @contextmanager
 def store_lock(root, initialize):
     if initialize:
@@ -223,14 +246,29 @@ def store_lock(root, initialize):
     manifest_exists = read_manifest(root)
     lock = root / ".writer.lock"
     if not manifest_exists and not initialize:
-        if path_kind(lock, directory=True, optional=True):
+        try:
+            locked = path_kind(lock, directory=True, optional=True)
+        except PermissionError:
+            if not lock_pending_removal(lock):
+                raise
+            locked = True
+        if locked:
             raise Failure("Store is busy", 5)
         require(read_manifest(root), "Store is uninitialized")
     try:
         lock.mkdir(mode=0o700)
     except FileExistsError:
-        path_kind(lock, directory=True)
-        raise Failure("Store is busy", 5)
+        # The holder may remove the lock before we inspect it; that is still busy.
+        try:
+            path_kind(lock, directory=True, optional=True)
+        except PermissionError:
+            if not lock_pending_removal(lock):
+                raise
+        raise Failure("Store is busy", 5) from None
+    except PermissionError:
+        if not lock_pending_removal(lock):
+            raise
+        raise Failure("Store is busy", 5) from None
     try:
         yield
     finally:
@@ -255,9 +293,9 @@ def initialize_store(root):
 
 
 def blockers(issue, issues):
-    return [{"id": dep, "state": issues[dep]["state"]}
-            for dep in issue["depends_on"] if issues[dep]["state"] != "closed"]
-
+    return [
+        {"id": dep, "state": issues[dep]["state"]} for dep in issue["depends_on"] if issues[dep]["state"] != "closed"
+    ]
 
 
 def markdown_cell(value):
@@ -287,8 +325,14 @@ def render_board(ordered, issues, generated):
         dependencies = ", ".join(item["id"] + " (" + item["state"] + ")" for item in unresolved) or "—"
         cells = (issue["id"], issue["title"], owner, dependencies)
         sections[section].append("| " + " | ".join(markdown_cell(cell) for cell in cells) + " |")
-    lines = ["# Beadcrumbs board", "", f"Generated at {generated}.",
-             "", "Snapshot of the issue store. Regenerate with --board. Manual edits are replaced.", ""]
+    lines = [
+        "# Beadcrumbs board",
+        "",
+        f"Generated at {generated}.",
+        "",
+        "Snapshot of the issue store. Regenerate with --board. Manual edits are replaced.",
+        "",
+    ]
     for name, rows in sections.items():
         lines.extend([f"## {name} ({len(rows)})", ""])
         if rows:
@@ -321,8 +365,11 @@ def run_action(args, root, issues, codec=ISSUE_CODEC):
     if action == "ready":
         return [item for item in ordered if item["state"] == "open" and not blockers(item, issues)]
     if action == "blocked":
-        return [{"issue": item, "blockers": blockers(item, issues)}
-                for item in ordered if item["state"] == "open" and blockers(item, issues)]
+        return [
+            {"issue": item, "blockers": blockers(item, issues)}
+            for item in ordered
+            if item["state"] == "open" and blockers(item, issues)
+        ]
     if action == "create":
         for dep in args.depends_on:
             if dep not in issues:
@@ -331,10 +378,19 @@ def run_action(args, root, issues, codec=ISSUE_CODEC):
         while key in issues:
             key = "bc-" + uuid.uuid4().hex
         now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-        issue = dict(id=key, title=args.create, description=args.description,
-                     acceptance_criteria=args.acceptance_criteria, state="open",
-                     depends_on=args.depends_on, claim=None, notes=[],
-                     created_at=now, updated_at=now, revision=1)
+        issue = dict(
+            id=key,
+            title=args.create,
+            description=args.description,
+            acceptance_criteria=args.acceptance_criteria,
+            state="open",
+            depends_on=args.depends_on,
+            claim=None,
+            notes=[],
+            created_at=now,
+            updated_at=now,
+            revision=1,
+        )
     else:
         key = getattr(args, action)
         if key not in issues:
@@ -370,8 +426,22 @@ class ArgumentParser(argparse.ArgumentParser):
 
 def parse_args(argv):
     parser = ArgumentParser(description=__doc__, allow_abbrev=False, add_help=False)
-    actions = ("init", "create", "show", "list", "ready", "blocked", "validate",
-               "claim", "note", "release", "close", "board", "help", "version")
+    actions = (
+        "init",
+        "create",
+        "show",
+        "list",
+        "ready",
+        "blocked",
+        "validate",
+        "claim",
+        "note",
+        "release",
+        "close",
+        "board",
+        "help",
+        "version",
+    )
     values = {"create", "show", "claim", "note", "release", "close"}
     group = parser.add_mutually_exclusive_group(required=True)
     for action in actions:
@@ -379,8 +449,16 @@ def parse_args(argv):
             group.add_argument("--" + action)
         else:
             group.add_argument("--" + action, action="store_true")
-    for name in ("workspace", "state", "agent", "token", "text", "description",
-                 "description-file", "acceptance-criteria"):
+    for name in (
+        "workspace",
+        "state",
+        "agent",
+        "token",
+        "text",
+        "description",
+        "description-file",
+        "acceptance-criteria",
+    ):
         parser.add_argument("--" + name)
     parser.add_argument("--depends-on", action="append", default=[])
     parser.add_argument("--json", action="store_true")
@@ -392,15 +470,18 @@ def parse_args(argv):
                 parser.error(f"Repeated option: {option}")
             seen.add(option)
     args = parser.parse_args(argv)
-    args.action = next(name for name in actions if getattr(args, name) is not None
-                       and getattr(args, name) is not False)
+    args.action = next(name for name in actions if getattr(args, name) is not None and getattr(args, name) is not False)
     allowed = {"--" + args.action}
     if args.action not in ("help", "version"):
         allowed.update(("--workspace", "--json"))
-    options = {"create": {"--depends-on", "--description", "--description-file",
-                          "--acceptance-criteria"},
-               "list": {"--state"}, "claim": {"--agent"}, "note": {"--agent", "--text"},
-               "release": {"--token"}, "close": {"--token"}}
+    options = {
+        "create": {"--depends-on", "--description", "--description-file", "--acceptance-criteria"},
+        "list": {"--state"},
+        "claim": {"--agent"},
+        "note": {"--agent", "--text"},
+        "release": {"--token"},
+        "close": {"--token"},
+    }
     if seen - allowed - options.get(args.action, set()):
         parser.error("Option does not apply to this action")
     if args.action == "help":
@@ -427,8 +508,10 @@ def parse_args(argv):
             require(args.state in ("open", "claimed", "closed"), "Invalid state")
         if args.action == "create":
             text_value(args.create, nonempty=True)
-        require(args.description is None or args.description_file is None,
-                "Description and description-file are mutually exclusive")
+        require(
+            args.description is None or args.description_file is None,
+            "Description and description-file are mutually exclusive",
+        )
         args.description = args.description or ""
         args.acceptance_criteria = args.acceptance_criteria or ""
         text_value(args.description)
@@ -470,7 +553,7 @@ def main(argv=None):
         print("beadcrumbs: " + safe_text(error), file=sys.stderr)
         return error.code
     except BrokenPipeError:
-        sys.stdout = open(os.devnull, "w")
+        sys.stdout = open(os.devnull, "w")  # noqa: SIM115 - stays open to absorb writes during interpreter shutdown
         print("beadcrumbs: output pipe closed; inspect state before retrying", file=sys.stderr)
         return 1
     except (OSError, ValueError, MemoryError, RecursionError) as error:

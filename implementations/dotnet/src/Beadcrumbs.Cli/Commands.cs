@@ -51,8 +51,11 @@ public sealed class Arguments
             string[] specific = result.Action switch
             {
                 "create" => ["depends-on", "description", "description-file", "acceptance-criteria"],
-                "list" => ["state"], "claim" => ["agent"], "note" => ["agent", "text"],
-                "release" or "close" => ["token"], _ => []
+                "list" => ["state"],
+                "claim" => ["agent"],
+                "note" => ["agent", "text"],
+                "release" or "close" => ["token"],
+                _ => []
             };
             foreach (string key in result.Options.Keys)
             {
@@ -177,10 +180,17 @@ public static class Commands
             string created = Model.Now();
             issue = new JsonObject
             {
-                ["id"] = id, ["title"] = args.Value, ["description"] = args.Get("description"),
-                ["acceptance_criteria"] = args.Get("acceptance-criteria"), ["state"] = "open",
+                ["id"] = id,
+                ["title"] = args.Value,
+                ["description"] = args.Get("description"),
+                ["acceptance_criteria"] = args.Get("acceptance-criteria"),
+                ["state"] = "open",
                 ["depends_on"] = new JsonArray(args.Dependencies.Select(id => (JsonNode?)JsonValue.Create(id)).ToArray()),
-                ["claim"] = null, ["notes"] = new JsonArray(), ["created_at"] = created, ["updated_at"] = created, ["revision"] = 1L
+                ["claim"] = null,
+                ["notes"] = new JsonArray(),
+                ["created_at"] = created,
+                ["updated_at"] = created,
+                ["revision"] = 1L
             };
         }
         else

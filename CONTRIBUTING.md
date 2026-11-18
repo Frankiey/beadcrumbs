@@ -34,6 +34,21 @@ python3 -m unittest discover -s tests -v
 
 Each port has its own build guide under [`implementations/`](implementations/README.md). All builds work offline once toolchains and locked dependencies are present.
 
+### Make targets
+
+The [Makefile](Makefile) holds the commands CI runs, so a green `make check` locally should mean a green pull request. Run `make` to list every target.
+
+| Command | What it does |
+| --- | --- |
+| `make check` | Lint, test, and check docs for all five clients |
+| `make lint` / `make fmt` | Check formatting and lint, or fix formatting in place |
+| `make test` | Run each client's own test suite |
+| `make matrix` | Build every client, then run the shared CLI suite for each and every client pair |
+| `make docs` | Check Markdown links and anchors, and that schemas and fixtures parse |
+| `make py-test`, `make go-lint`, … | Run one step for one client |
+
+Python linting uses [Ruff](https://docs.astral.sh/ruff/) pinned in the Makefile, run through `uvx` when it is installed. Ruff is a development tool only; `beadcrumbs.py` stays dependency-free. Rust and npm commands default to `--offline`. Pass `CARGO_NET= NPM_NET=` to let them fetch locked dependencies.
+
 ## Repository layout
 
 ```text
@@ -45,6 +60,9 @@ tests/
   test_interop.py          # Pairwise client interoperability
   test_storage.py          # Reference-only fault injection
   fixtures/cases.json      # Shared deterministic scenarios
+tools/check_docs.py        # Link, anchor, and JSON checks (make docs)
+Makefile, ruff.toml        # Local commands and lint settings shared with CI
+.github/workflows/ci.yml   # Pull request checks
 integration/
   run.py                   # Persistent lifecycle example
   test_clients.py          # 5-client × 10-pair matrix
@@ -91,11 +109,11 @@ python3 integration/test_clients.py
 
 Before opening a pull request:
 
-- [ ] `python3 -m unittest discover -s tests -v` passes.
+- [ ] `make check` passes, or at least `make py-lint py-test` for Python-only changes.
 - [ ] New behavior has a test. Tests that create tracker data use **temporary workspaces**.
 - [ ] Specs and examples are updated when behavior changes.
 - [ ] `beadcrumbs.py` still imports only standard-library modules.
-- [ ] If ports are affected, `python3 integration/test_clients.py` passes or the PR says which clients still need updating.
+- [ ] If ports are affected, `make matrix` passes or the PR says which clients still need updating.
 - [ ] [PROGRESS.md](PROGRESS.md) records what was done and how it was verified.
 
 ## Proposing a feature

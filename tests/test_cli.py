@@ -1,11 +1,12 @@
 """Black-box conformance tests. BEADCRUMBS_COMMAND is a JSON argv array."""
+
 import json
 import os
-from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import unittest
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 COMMAND = json.loads(os.environ.get("BEADCRUMBS_COMMAND", json.dumps([sys.executable, str(ROOT / "beadcrumbs.py")])))
@@ -19,8 +20,9 @@ class CliTests(unittest.TestCase):
         self.workspace = Path(self.temp.name)
 
     def call(self, *args, code=0, stdin=None):
-        result = subprocess.run(COMMAND + list(args), cwd=self.workspace,
-                                input=stdin, capture_output=True, text=True, timeout=20)
+        result = subprocess.run(
+            COMMAND + list(args), cwd=self.workspace, input=stdin, capture_output=True, text=True, timeout=20
+        )
         self.assertEqual(result.returncode, code, result.stderr)
         if code:
             self.assertEqual(result.stdout, "")
@@ -37,9 +39,17 @@ class CliTests(unittest.TestCase):
     def test_help_version_and_invalid_invocations(self):
         self.assertIn("--ready", self.call("--help").stdout)
         self.assertIn("beadcrumbs", self.call("--version").stdout)
-        for args in [[], ["--rea"], ["--ready", "--ready"], ["--help", "--json"],
-                     ["--ready", "--agent", "worker"], ["--show", "../escape"],
-                     ["--create", ""], ["--claim", MISSING], ["--ready", "--show", MISSING]]:
+        for args in [
+            [],
+            ["--rea"],
+            ["--ready", "--ready"],
+            ["--help", "--json"],
+            ["--ready", "--agent", "worker"],
+            ["--show", "../escape"],
+            ["--create", ""],
+            ["--claim", MISSING],
+            ["--ready", "--show", MISSING],
+        ]:
             with self.subTest(args=args):
                 self.call(*args, code=2)
         self.assertEqual(list(self.workspace.iterdir()), [])
@@ -53,26 +63,29 @@ class CliTests(unittest.TestCase):
                 try:
                     store = self.workspace / ".beadcrumbs"
                     (store / "issues").mkdir(parents=True)
-                    (store / "store.json").write_text(json.dumps(case.get("manifest", {"format":"beadcrumbs","version":1})))
+                    (store / "store.json").write_text(
+                        json.dumps(case.get("manifest", {"format": "beadcrumbs", "version": 1}))
+                    )
                     for issue in case["issues"]:
                         (store / "issues" / (issue["id"] + ".json")).write_text(json.dumps(issue))
-                    before = {str(p):p.read_bytes() for p in store.rglob("*") if p.is_file()}
+                    before = {str(p): p.read_bytes() for p in store.rglob("*") if p.is_file()}
                     for command in case["commands"]:
                         result = self.call(*command["args"], "--json", code=command["code"])
                         if command["code"] == 0:
                             self.assertEqual(json.loads(result.stdout), command["result"])
-                    self.assertEqual(before, {str(p):p.read_bytes() for p in store.rglob("*") if p.is_file()})
+                    self.assertEqual(before, {str(p): p.read_bytes() for p in store.rglob("*") if p.is_file()})
                     self.assertFalse((store / ".writer.lock").exists())
                 finally:
                     self.workspace = old
 
     def test_lifecycle(self):
         self.init()
-        a = self.value("--create", "Prerequisite", "--description", "Multiline\n日本語",
-                       "--acceptance-criteria", "Tests pass")
+        a = self.value(
+            "--create", "Prerequisite", "--description", "Multiline\n日本語", "--acceptance-criteria", "Tests pass"
+        )
         b = self.value("--create", "Dependent", "--depends-on", a["id"])
         self.assertEqual([a], self.value("--ready"))
-        self.assertEqual(self.value("--blocked")[0]["blockers"], [{"id":a["id"],"state":"open"}])
+        self.assertEqual(self.value("--blocked")[0]["blockers"], [{"id": a["id"], "state": "open"}])
         self.call("--claim", b["id"], "--agent", "worker", code=4)
         claim = self.value("--claim", a["id"], "--agent", "worker")
         token = claim["claim"]["token"]
@@ -112,13 +125,20 @@ class CliTests(unittest.TestCase):
     def test_concurrent_claims(self):
         self.init()
         issue = self.value("--create", "Race")["id"]
-        processes = [subprocess.Popen(COMMAND + ["--claim", issue, "--agent", f"worker-{n}", "--json"],
-                     cwd=self.workspace, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-                     for n in range(8)]
+        processes = [
+            subprocess.Popen(
+                COMMAND + ["--claim", issue, "--agent", f"worker-{n}", "--json"],
+                cwd=self.workspace,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            for n in range(8)
+        ]
         outputs = [p.communicate(timeout=20) for p in processes]
-        winners = [json.loads(out[0]) for p,out in zip(processes, outputs) if p.returncode == 0]
+        winners = [json.loads(out[0]) for p, out in zip(processes, outputs, strict=True) if p.returncode == 0]
         self.assertEqual(len(winners), 1)
-        self.assertTrue(all(p.returncode in (0,4,5) for p in processes))
+        self.assertTrue(all(p.returncode in (0, 4, 5) for p in processes))
         self.assertEqual(self.value("--show", issue), winners[0])
 
     def test_description_inputs_and_idempotent_init(self):
@@ -128,7 +148,15 @@ class CliTests(unittest.TestCase):
         file.write_bytes(text.encode())
         issue = self.value("--create", "File", "--description-file", str(file))
         self.assertEqual(issue["description"], text)
-        result = self.call("--create", "Stdin", "--description-file", "-", "--json", stdin="你好\n")
+        # Send bytes: a text-mode pipe would translate LF to CRLF on Windows.
+        result = subprocess.run(
+            [*COMMAND, "--create", "Stdin", "--description-file", "-", "--json"],
+            cwd=self.workspace,
+            input="你好\n".encode(),
+            capture_output=True,
+            timeout=20,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(json.loads(result.stdout)["description"], "你好\n")
         self.init()
         self.assertEqual(self.value("--show", issue["id"]), issue)
@@ -139,10 +167,14 @@ class CliTests(unittest.TestCase):
         self.init()
         issue = self.value("--create", "Task")
         path = self.workspace / ".beadcrumbs/issues" / (issue["id"] + ".json")
-        for payload in ['{"id":1,"id":2}', json.dumps(dict(issue,revision=1.0)),
-                        json.dumps(dict(issue,title="\ud800")), json.dumps(dict(issue,revision=True)),
-                        json.dumps(dict(issue,created_at="2026-02-30T00:00:00Z")),
-                        json.dumps(dict(issue,claim={"agent":"x","token":"x"}))]:
+        for payload in [
+            '{"id":1,"id":2}',
+            json.dumps(dict(issue, revision=1.0)),
+            json.dumps(dict(issue, title="\ud800")),
+            json.dumps(dict(issue, revision=True)),
+            json.dumps(dict(issue, created_at="2026-02-30T00:00:00Z")),
+            json.dumps(dict(issue, claim={"agent": "x", "token": "x"})),
+        ]:
             with self.subTest(payload=payload):
                 path.write_text(payload)
                 self.call("--validate", code=1)
@@ -188,23 +220,33 @@ class CliTests(unittest.TestCase):
         self.assertEqual(extra.read_text(), "preserve")
 
     def test_simultaneous_initialization(self):
-        processes = [subprocess.Popen(COMMAND + ["--init", "--json"], cwd=self.workspace,
-                     stdout=subprocess.PIPE, stderr=subprocess.PIPE) for _ in range(8)]
+        processes = [
+            subprocess.Popen(
+                COMMAND + ["--init", "--json"], cwd=self.workspace, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+            )
+            for _ in range(8)
+        ]
         for process in processes:
-            stdout, stderr = process.communicate(timeout=20)
+            _stdout, stderr = process.communicate(timeout=20)
             self.assertIn(process.returncode, (0, 5), stderr)
-        self.assertEqual(self.value("--validate"), {"valid":True, "issue_count":0})
+        self.assertEqual(self.value("--validate"), {"valid": True, "issue_count": 0})
 
     def test_concurrent_notes_preserve_successful_writes(self):
         self.init()
         issue = self.value("--create", "Notes")["id"]
-        processes = [subprocess.Popen(COMMAND + ["--note", issue, "--agent", "worker",
-                     "--text", str(n), "--json"], cwd=self.workspace,
-                     stdout=subprocess.PIPE, stderr=subprocess.PIPE) for n in range(8)]
+        processes = [
+            subprocess.Popen(
+                COMMAND + ["--note", issue, "--agent", "worker", "--text", str(n), "--json"],
+                cwd=self.workspace,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            for n in range(8)
+        ]
         expected = []
         for n, process in enumerate(processes):
             _, stderr = process.communicate(timeout=20)
-            self.assertIn(process.returncode, (0,5), stderr)
+            self.assertIn(process.returncode, (0, 5), stderr)
             if process.returncode == 0:
                 expected.append(str(n))
         actual = self.value("--show", issue)
@@ -224,8 +266,7 @@ class CliTests(unittest.TestCase):
         other.mkdir()
         (self.workspace / "brief.txt").write_bytes(b"local\r\n")
         self.value("--workspace", str(other), "--init")
-        issue = self.value("--workspace", str(other), "--create", "Task",
-                           "--description-file", "brief.txt")
+        issue = self.value("--workspace", str(other), "--create", "Task", "--description-file", "brief.txt")
         self.assertEqual(issue["description"], "local\r\n")
         self.assertFalse((self.workspace / ".beadcrumbs").exists())
 
@@ -253,7 +294,7 @@ class CliTests(unittest.TestCase):
         token = self.value("--claim", done["id"], "--agent", "worker")["claim"]["token"]
         self.value("--close", done["id"], "--token", token)
         files = self.workspace / ".beadcrumbs/issues"
-        before = {p.name:p.read_bytes() for p in files.iterdir()}
+        before = {p.name: p.read_bytes() for p in files.iterdir()}
         self.value("--board")
         path = self.workspace / "board.md"
         content = path.read_text()
@@ -263,7 +304,7 @@ class CliTests(unittest.TestCase):
         self.assertNotIn("<script>", content)
         self.assertNotIn("\u202e", content)
         self.assertNotIn(claim["claim"]["token"], content)
-        self.assertEqual(before, {p.name:p.read_bytes() for p in files.iterdir()})
+        self.assertEqual(before, {p.name: p.read_bytes() for p in files.iterdir()})
         token = self.value("--claim", first["id"], "--agent", "worker")["claim"]["token"]
         self.value("--close", first["id"], "--token", token)
         self.assertEqual(path.read_text(), content)

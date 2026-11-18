@@ -266,6 +266,15 @@ python3 integration/run.py --setup-only    # leave a workspace to explore by han
 python3 integration/test_clients.py        # full 5-client × 10-pair matrix (after building ports)
 ```
 
+With the toolchains installed, the [Makefile](Makefile) wraps the common commands. CI runs the same targets on every pull request:
+
+```sh
+make            # list all targets
+make check      # lint, test, and docs checks for every client
+make matrix     # build all clients and run the cross-client matrix
+make fmt        # auto-format everything
+```
+
 The suites cover competing claims across processes, stale tokens, simultaneous init, process death immediately before and after the atomic rename, `fsync` and replace failures, corrupt stores (duplicate keys, invalid Unicode, cycles, FIFOs), and a full lifecycle under an audit hook that rejects any network or subprocess call. Details are in [conformance](docs/conformance.md).
 
 ## 🆚 How does it compare?

@@ -97,7 +97,8 @@ func locked(root string, initialize bool, action func() (any, error)) (result an
 		if !os.IsExist(err) {
 			return nil, err
 		}
-		if _, err = pathKind(lock, true, false); err != nil {
+		// The holder may remove the lock before we inspect it; that is still busy.
+		if _, err = pathKind(lock, true, true); err != nil {
 			return nil, err
 		}
 		return nil, failure(5, "store busy")

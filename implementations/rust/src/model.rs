@@ -230,7 +230,7 @@ pub fn validate(issue: &Issue) -> Result<()> {
     require(
         issue["revision"]
             .as_u64()
-            .is_some_and(|n| n >= 1 && n <= MAX_REVISION),
+            .is_some_and(|n| (1..=MAX_REVISION).contains(&n)),
         "Invalid revision",
     )
 }
