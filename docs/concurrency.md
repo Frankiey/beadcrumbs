@@ -27,7 +27,7 @@ Callers can retry busy results with bounded backoff. `--ready` is a snapshot, wh
 
 ## Initialization
 
-Require the selected workspace to exist. Create `.beadcrumbs/` if needed and acquire its lock before creating any other store entries. Under the lock, accept a missing manifest only when the store root contains the lock, an optional empty ordinary `issues/` directory, and optional regular files named `.tmp-<token>` using the token syntax in the [protocol](protocol.md#issue-record). Leave any other uninitialized contents intact and report an error. Create `issues/` if absent, then publish the manifest last. An existing v1 store must pass validation before `--init` reports success.
+Require the selected workspace to exist. Create `.beadcrumbs/` if needed and acquire its lock before creating any other store entries. Under the lock, accept a missing manifest only when the store root contains the lock, optional empty ordinary `issues/` and `epics/` directories, and optional regular files named `.tmp-<token>` using the token syntax in the [protocol](protocol.md#issue-record). Leave any other uninitialized contents intact and report an error. Create `issues/` and `epics/` if absent, then publish the manifest last. An existing v1 store must pass validation before `--init` reports success.
 
 ## Publishing a record
 

@@ -82,7 +82,11 @@ There's no delete command. Deleting a file by hand would break any issue that de
 
 ### Is there priority ordering?
 
-Not yet. `--ready` is ordered by `created_at` then ID, so create urgent work first, or use dependencies. Priority is a planned [Next](features.md) feature.
+Yes. Create issues with `--priority 0` (most urgent) through `4`; the default is `2`. `--ready`, `--list`, and `--blocked` sort by priority, then creation time, then ID. Priority is fixed at creation.
+
+### Are there epics, stories, or sub-tasks?
+
+There's one kind of issue. Group related issues into an **epic**: a separate record with a key, a title, and an editable description. Create one with `--create-epic KEY --title TITLE`, assign issues with `--epic KEY` on create or `--set-epic ID --epic KEY` later, and see progress with `--show-epic KEY`. Epics have no state of their own and never block work; use `--depends-on` for ordering. Each issue also has a type (`task`, `bug`, `chore`, `docs`, or `spike`) for filtering.
 
 ### Can I use a store on a network share or Dropbox?
 

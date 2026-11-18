@@ -3,7 +3,6 @@
 
 import argparse
 import json
-import os
 import subprocess
 import sys
 import tempfile
@@ -53,6 +52,7 @@ def run_scenario(workspace, transcript, setup_only):
         return json.loads(result.stdout)
 
     call("--init")
+    epic = call("--create-epic", "offline-docs", "--title", "Offline documentation")
     brief = workspace / "brief.md"
     # Write bytes so the brief has LF endings on every platform; write_text would use CRLF on Windows.
     brief_text = "Document the offline setup.\nVerify Unicode survives — café.\n"
@@ -64,8 +64,15 @@ def run_scenario(workspace, transcript, setup_only):
         str(brief),
         "--acceptance-criteria",
         "A new worker can run the documented steps.",
+        "--type",
+        "docs",
+        "--priority",
+        "1",
+        "--epic",
+        epic["key"],
     )
-    second = call("--create", "Verify the setup guide", "--depends-on", first["id"])
+    second = call("--create", "Verify the setup guide", "--depends-on", first["id"], "--epic", epic["key"])
+    check((first["type"], first["priority"], first["epic"]) == ("docs", 1, epic["key"]), "Unexpected fields")
     check(first["description"] == brief_text, "Brief changed", expected=brief_text, actual=first["description"])
     check(call("--ready") == [first], "Unexpected initial ready list")
     check(
@@ -97,10 +104,12 @@ def run_scenario(workspace, transcript, setup_only):
     call("--note", second["id"], "--agent", "reviewer", "--text", "Guide verified.")
     call("--close", second["id"], "--token", claim["claim"]["token"])
     check(len(call("--list", "--state", "closed")) == 2, "Expected two closed issues")
-    followup = call("--create", "Explore this example workspace")
+    progress = call("--show-epic", epic["key"])["counts"]
+    check(progress == {"ready": 0, "blocked": 0, "claimed": 0, "closed": 2}, "Epic not complete", progress=progress)
+    followup = call("--create", "Explore this example workspace", "--type", "chore")
     check(call("--ready") == [followup], "Expected ready follow-up")
     check(call("--blocked") == [], "Unexpected remaining blockers")
-    check(call("--validate") == {"valid": True, "issue_count": 3}, "Validation failed")
+    check(call("--validate") == {"valid": True, "issue_count": 3, "epic_count": 1}, "Validation failed")
     call("--init")
     check(len(call("--list")) == 3, "Repeated initialization changed the store")
     call("--board")
@@ -132,11 +141,6 @@ def main():
     (run / "summary.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(summary, indent=2))
     print(f"Command transcript: {run / 'commands.jsonl'}")
-    if summary["status"] != "passed" and os.environ.get("GITHUB_ACTIONS"):
-        # Temporary CI diagnostics: show the last commands, since run directories are not uploaded.
-        lines = (run / "commands.jsonl").read_text(encoding="utf-8").splitlines()
-        print("Last commands:")
-        print("\n".join(lines[-5:]))
     return 0 if summary["status"] == "passed" else 1
 
 

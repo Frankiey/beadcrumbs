@@ -39,8 +39,9 @@ Add something like this to your project's `AGENTS.md`, `CLAUDE.md`, or `.github/
 This repository tracks work in `.beadcrumbs/` using `python3 beadcrumbs.py`.
 Always pass `--json` and check the exit code.
 
-1. Find work: `python3 beadcrumbs.py --ready --json`. If it is empty, run `--blocked --json`
-   and report what is waiting.
+1. Find work: `python3 beadcrumbs.py --ready --json`. It is sorted most urgent first (priority 0
+   to 4). Narrow it with `--epic <key>` or `--type bug` if your task names one. If it is empty,
+   run `--blocked --json` and report what is waiting.
 2. Claim exactly one issue: `python3 beadcrumbs.py --claim <ID> --agent <your-label> --json`.
    Save `claim.token` from the result. Exit 4 means someone else has it; pick another.
    Exit 5 means the store is busy; wait a second and retry (max ~10 tries).
@@ -49,7 +50,8 @@ Always pass `--json` and check the exit code.
    `--note <ID> --agent <your-label> --text "<what you did / found>"`.
 5. When the acceptance criteria are met: `--close <ID> --token <token>`.
    If you must stop without finishing: `--release <ID> --token <token>` and leave a note why.
-6. To split work, create follow-ups with `--create "<title>" --depends-on <ID>`.
+6. To split work, create follow-ups with `--create "<title>" --depends-on <ID>`. Keep them in
+   the same epic with `--epic <key>`, and record bugs you find with `--type bug`.
 7. Never edit files under `.beadcrumbs/` directly. Exit 1 means the store is invalid: stop and
    tell a human.
 ````
@@ -133,6 +135,7 @@ flowchart LR
 | `--claim` | ⚠️ | `--show`: is it already claimed by you? Your token is in the record. |
 | `--release` / `--close` | ✅ | A repeat fails with exit 4 and changes nothing. |
 | `--note` | ❌ | `--show`: is the last note already yours? |
+| `--set-epic` / `--edit-epic` | ✅ | A repeat fails with exit 4 and changes nothing. |
 | `--create` | ❌ | `--list`: does an identical title already exist? |
 
 ## Recovering from crashes
@@ -159,6 +162,8 @@ python3 beadcrumbs.py --create "Add retry to payment webhook" \
 
 - Put the *what* and *why* in `--description`, and the *done* test in `--acceptance-criteria`. Both are immutable, so get them right before agents start.
 - Model ordering with `--depends-on` rather than prose ("do this after X"). Agents then pick it up automatically when it becomes ready.
+- Use `--priority 0`–`4` for urgency among ready work, and `--type` to separate bugs and chores from feature work. Neither blocks anything.
+- Group related issues into an epic (`--create-epic KEY --title …`, then `--epic KEY` on create or `--set-epic` later), and check progress with `--show-epic KEY`.
 - Fan out with several issues that depend on a single design issue, and fan in with one issue that depends on all of them.
 
 ```mermaid
@@ -166,6 +171,8 @@ flowchart LR
     D["Design API"] --> A["Impl: orders"] & B["Impl: customers"] & C["Impl: invoices"]
     A & B & C --> I["Integration tests"]
 ```
+
+Put all five in one epic and `--show-epic` reports how many are ready, blocked, claimed, and closed.
 
 ## Multiple languages, one store
 

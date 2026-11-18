@@ -58,6 +58,28 @@ class InteroperabilityTests(unittest.TestCase):
         )
         self.assertEqual(self.call(PEER, "--validate")["issue_count"], 2)
 
+    def test_epics_types_and_priorities_across_clients(self):
+        self.call(PRIMARY, "--init")
+        self.call(PEER, "--create-epic", "shared", "--title", "Shared epic", "--description", "λ")
+        self.call(PRIMARY, "--create-epic", "shared", "--title", "Again", code=4)
+        low = self.call(PRIMARY, "--create", "Low", "--priority", "4", "--type", "chore")
+        bug = self.call(PEER, "--create", "Bug", "--priority", "0", "--type", "bug", "--epic", "shared")
+        self.assertEqual(self.call(PRIMARY, "--ready"), [bug, low])
+        moved = self.call(PRIMARY, "--set-epic", low["id"], "--epic", "shared")
+        self.assertEqual(self.call(PEER, "--show", low["id"]), moved)
+        edited = self.call(PRIMARY, "--edit-epic", "shared", "--description", "Updated")
+        self.assertEqual(self.call(PEER, "--epics"), [edited])
+        self.assertEqual(self.call(PEER, "--show-epic", "shared"), self.call(PRIMARY, "--show-epic", "shared"))
+        self.assertEqual(self.call(PEER, "--ready", "--type", "bug", "--epic", "shared"), [bug])
+        self.call(PEER, "--board")
+        first_board = (self.workspace / "board.md").read_text().splitlines()
+        self.call(PRIMARY, "--board")
+        second_board = (self.workspace / "board.md").read_text().splitlines()
+        self.assertEqual(
+            [line for line in first_board if not line.startswith("Generated at ")],
+            [line for line in second_board if not line.startswith("Generated at ")],
+        )
+
     def test_mixed_client_claim_race(self):
         self.call(PEER, "--init")
         issue = self.call(PEER, "--create", "Shared race")

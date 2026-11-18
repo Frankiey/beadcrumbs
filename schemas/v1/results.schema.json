@@ -56,11 +56,16 @@
         "issue_count": {
           "type": "integer",
           "minimum": 0
+        },
+        "epic_count": {
+          "type": "integer",
+          "minimum": 0
         }
       },
       "required": [
         "valid",
-        "issue_count"
+        "issue_count",
+        "epic_count"
       ],
       "additionalProperties": false
     },
@@ -75,6 +80,10 @@
           "type": "integer",
           "minimum": 0
         },
+        "epic_count": {
+          "type": "integer",
+          "minimum": 0
+        },
         "generated_at": {
           "type": "string",
           "format": "date-time"
@@ -83,7 +92,62 @@
       "required": [
         "path",
         "issue_count",
+        "epic_count",
         "generated_at"
+      ],
+      "additionalProperties": false
+    },
+    "epics": {
+      "type": "array",
+      "items": {
+        "$ref": "epic.schema.json"
+      }
+    },
+    "epic_detail": {
+      "type": "object",
+      "properties": {
+        "epic": {
+          "$ref": "epic.schema.json"
+        },
+        "counts": {
+          "type": "object",
+          "properties": {
+            "ready": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "blocked": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "claimed": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "closed": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "ready",
+            "blocked",
+            "claimed",
+            "closed"
+          ],
+          "additionalProperties": false
+        },
+        "issues": {
+          "type": "array",
+          "items": {
+            "$ref": "issue.schema.json"
+          }
+        }
+      },
+      "required": [
+        "epic",
+        "counts",
+        "issues"
       ],
       "additionalProperties": false
     }

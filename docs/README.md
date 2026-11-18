@@ -72,7 +72,10 @@ These documents form the v1 draft 1 contract. If two of them disagree, that is a
 | Term | Meaning |
 | --- | --- |
 | **Workspace** | The directory selected with `--workspace` (default: the current directory). It contains `.beadcrumbs/`. Parent directories are never searched. |
-| **Store** | `.beadcrumbs/`: a manifest (`store.json`) plus one JSON file per issue under `issues/`. |
+| **Store** | `.beadcrumbs/`: a manifest (`store.json`) plus one JSON file per issue under `issues/` and one per epic under `epics/`. |
+| **Epic** | A named group of issues with a fixed key and title and an editable description. Its progress is derived from its issues. |
+| **Type** | An issue's fixed category: `task`, `bug`, `chore`, `docs`, or `spike`. Used for filtering only. |
+| **Priority** | An issue's fixed urgency from 0 (most urgent) to 4. Lists sort by priority, then age. |
 | **Ready** | An `open` issue whose direct dependencies are all `closed`. This view is derived, not stored. |
 | **Blocked** | An `open` issue with at least one dependency that is `open` or `claimed`. This view is derived, not stored. |
 | **Claim token** | A fresh random value issued by each successful `--claim`, required to `--release` or `--close` that specific claim. |

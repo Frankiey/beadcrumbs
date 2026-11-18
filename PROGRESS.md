@@ -1,6 +1,6 @@
 # Implementation progress
 
-Updated 14 November 2026. Reference client 0.1.0 implements core contract v1 draft 1.
+Updated 18 November 2026. Reference client 0.1.0 implements core contract v1 draft 1, including issue types, priority, and epics.
 
 Read this file and AGENTS.md when continuing in another chat. Keep completed work, evidence, and outstanding verification current here.
 
@@ -15,7 +15,7 @@ Read this file and AGENTS.md when continuing in another chat. Keep completed wor
 
 ## Verification
 
-Run `python3 -m unittest discover -s tests -v` from the repository root. The default Python discovery currently has 29 test methods, with 26 active and three pair tests skipped unless a peer is configured, including parameterized cases and six shared fixture scenarios. It passed on macOS with Python 3.15.2. Tests use temporary stores outside Git and require no external packages.
+Run `python3 -m unittest discover -s tests -v` from the repository root. The default Python discovery currently has 32 test methods, with 28 active and four pair tests skipped unless a peer is configured, including parameterized cases and eleven shared fixture scenarios. It passed on macOS with Python 3.15.2. Tests use temporary stores outside Git and require no external packages.
 
 The black-box CLI suite supports BEADCRUMBS_COMMAND as a JSON argv array for all clients. Reference-only fault injection stays in test_storage.py. Documentation links and JSON artifacts are checked during this implementation handoff.
 
@@ -80,3 +80,15 @@ Still open before announcing: CI across Linux, macOS, and Windows; minimum-toolc
 Added on 18 November 2026: a root Makefile with lint, format, test, build, matrix, and docs targets for all five clients; ruff.toml (Ruff 0.17.5, Python 3.10 target); tools/check_docs.py for links, anchors, and JSON parsing; and .github/workflows/ci.yml, which runs the same make targets on pull requests and main. Python tests run on Linux, macOS, and Windows with Python 3.10 and the latest 3.x. Go uses the go.mod minimum, Rust runs 1.85 and stable, and TypeScript runs Node 22 and the current LTS. .NET and the cross-client matrix run on Linux. A final "CI passed" job aggregates the results for branch protection.
 
 First lint pass fixes: Ruff formatting across Python files, import sorting, an unused import, `raise ... from None` in two places, explicit `zip(strict=True)`, executable bits on scripts with shebangs, a clippy range check in Rust, and dotnet format whitespace. There are no behavior changes. Locally on macOS, `make check` and `make matrix` pass (5 client suites and 10 pairs).
+
+## Issue types, priority, and epics
+
+Added on 18 November 2026 and kept within store version 1, since nothing had been released or announced.
+
+- Issue records gain `type` (`task`, `bug`, `chore`, `docs`, `spike`; default `task`), `priority` (0–4; default 2), and `epic` (an epic key or null). Type and priority are fixed at creation. The epic can change in any state through `--set-epic ID --epic KEY|none`, which needs no claim token and bumps the revision.
+- Epics are separate records at `.beadcrumbs/epics/<key>.json` with an immutable key and title, an editable description (`--edit-epic`), timestamps, and a revision. Keys are lowercase slugs, and `none` plus Windows device names are reserved. Epics have no state; `--show-epic` derives ready, blocked, claimed, and closed counts. An issue pointing to a missing epic invalidates the store.
+- Issue lists sort by priority, then `created_at`, then ID. `--list` and `--ready` filter by `--type` and `--epic KEY|none`. `--validate` and `--board` report `epic_count`. The board now opens with a per-epic status summary and has one table per epic plus "No epic", with Status, Type, and Priority columns.
+- `--init` creates `epics/`. Stores made before this change need the offline conversion described in the core contract.
+- Schemas: new `schemas/v1/epic.schema.json`; issue and result schemas updated. Shared fixtures add a combined epics/types/priority scenario and four invalid-store cases. New CLI and interop tests cover create, filter, set-epic, edit-epic, show-epic, conflicts, and board grouping across clients.
+- All five clients implement the change. Locally on macOS: Python unittest (28 active, 4 skipped pair tests), each port's native tests, `make check`, and `make matrix` (21 CLI tests per client and 4 interop tests per pair, all 15 suites passing). The integration example now uses an epic, a type, and a priority; its temporary CI diagnostics were removed.
+- Not yet verified: this branch's Linux and Windows CI runs.

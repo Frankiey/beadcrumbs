@@ -25,7 +25,26 @@ var tokenRE = regexp.MustCompile("^[0-9a-f]{12}4[0-9a-f]{3}[89ab][0-9a-f]{15}$")
 var agentRE = regexp.MustCompile("^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 var timeRE = regexp.MustCompile("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$")
 
+var epicRE = regexp.MustCompile("^[a-z0-9][a-z0-9-]{0,63}$")
+
 const maxRevision = int64(9007199254740991)
+const defaultPriority = int64(2)
+
+var issueTypes = []string{"task", "bug", "chore", "docs", "spike"}
+var statuses = []string{"ready", "blocked", "claimed", "closed"}
+
+// "none" clears an epic; the others are reserved device names on Windows.
+func epicKey(value string) bool {
+	if !epicRE.MatchString(value) {
+		return false
+	}
+	switch value {
+	case "none", "con", "prn", "aux", "nul":
+		return false
+	}
+	return !(len(value) == 4 && (strings.HasPrefix(value, "com") || strings.HasPrefix(value, "lpt")) &&
+		value[3] >= '0' && value[3] <= '9')
+}
 
 type Claim struct {
 	Agent string `json:"agent"`
@@ -38,6 +57,9 @@ type Note struct {
 }
 type Issue struct {
 	ID           string   `json:"id"`
+	Type         string   `json:"type"`
+	Priority     int64    `json:"priority"`
+	Epic         *string  `json:"epic"`
 	Title        string   `json:"title"`
 	Description  string   `json:"description"`
 	Acceptance   string   `json:"acceptance_criteria"`
@@ -48,6 +70,14 @@ type Issue struct {
 	Created      string   `json:"created_at"`
 	Updated      string   `json:"updated_at"`
 	Revision     int64    `json:"revision"`
+}
+type Epic struct {
+	Key         string `json:"key"`
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	Created     string `json:"created_at"`
+	Updated     string `json:"updated_at"`
+	Revision    int64  `json:"revision"`
 }
 type Blocker struct {
 	ID    string `json:"id"`
@@ -184,7 +214,9 @@ func validate(issue *Issue) error {
 	if !idRE.MatchString(issue.ID) || issue.Title == "" ||
 		(issue.State != "open" && issue.State != "claimed" && issue.State != "closed") ||
 		issue.Dependencies == nil || issue.Notes == nil || !validTime(issue.Created) ||
-		!validTime(issue.Updated) || issue.Revision < 1 || issue.Revision > maxRevision {
+		!validTime(issue.Updated) || issue.Revision < 1 || issue.Revision > maxRevision ||
+		!contains(issueTypes, issue.Type) || issue.Priority < 0 || issue.Priority > 4 ||
+		(issue.Epic != nil && !epicKey(*issue.Epic)) {
 		return fmt.Errorf("invalid issue fields")
 	}
 	if issue.State == "claimed" {
@@ -230,14 +262,20 @@ func (JSONCodec) Decode(data []byte) (*Issue, error) {
 	if err != nil {
 		return nil, err
 	}
-	if !exact(value, "id", "title", "description", "acceptance_criteria", "state", "depends_on", "claim", "notes", "created_at", "updated_at", "revision") {
+	if !exact(value, "id", "type", "priority", "epic", "title", "description", "acceptance_criteria", "state", "depends_on", "claim", "notes", "created_at", "updated_at", "revision") {
 		return nil, fmt.Errorf("invalid issue fields")
 	}
 	object := value.(map[string]any)
-	for _, key := range []string{"id", "title", "description", "acceptance_criteria", "state", "created_at", "updated_at"} {
+	for _, key := range []string{"id", "type", "title", "description", "acceptance_criteria", "state", "created_at", "updated_at"} {
 		if _, ok := object[key].(string); !ok {
 			return nil, fmt.Errorf("expected text")
 		}
+	}
+	if _, ok := object["priority"].(json.Number); !ok {
+		return nil, fmt.Errorf("invalid priority")
+	}
+	if _, ok := object["epic"].(string); !ok && object["epic"] != nil {
+		return nil, fmt.Errorf("invalid epic")
 	}
 	if object["claim"] != nil && !exact(object["claim"], "agent", "token") {
 		return nil, fmt.Errorf("invalid claim fields")
@@ -261,6 +299,39 @@ func (JSONCodec) Decode(data []byte) (*Issue, error) {
 	}
 	return &issue, nil
 }
+func decodeEpic(data []byte) (*Epic, error) {
+	value, err := strictJSON(data)
+	if err != nil {
+		return nil, err
+	}
+	if !exact(value, "key", "title", "description", "created_at", "updated_at", "revision") {
+		return nil, fmt.Errorf("invalid epic fields")
+	}
+	object := value.(map[string]any)
+	for _, key := range []string{"key", "title", "description", "created_at", "updated_at"} {
+		if _, ok := object[key].(string); !ok {
+			return nil, fmt.Errorf("expected text")
+		}
+	}
+	if _, ok := object["revision"].(json.Number); !ok {
+		return nil, fmt.Errorf("invalid revision")
+	}
+	var epic Epic
+	if err = json.Unmarshal(data, &epic); err != nil {
+		return nil, err
+	}
+	if err = validateEpic(&epic); err != nil {
+		return nil, err
+	}
+	return &epic, nil
+}
+func validateEpic(epic *Epic) error {
+	if !epicKey(epic.Key) || epic.Title == "" || !validTime(epic.Created) || !validTime(epic.Updated) ||
+		epic.Revision < 1 || epic.Revision > maxRevision {
+		return fmt.Errorf("invalid epic fields")
+	}
+	return nil
+}
 func encode(value any) ([]byte, error) {
 	var out bytes.Buffer
 	encoder := json.NewEncoder(&out)
@@ -278,12 +349,24 @@ func blockers(issue *Issue, issues map[string]*Issue) []Blocker {
 	}
 	return result
 }
+func status(issue *Issue, issues map[string]*Issue) string {
+	if issue.State == "open" {
+		if len(blockers(issue, issues)) > 0 {
+			return "blocked"
+		}
+		return "ready"
+	}
+	return issue.State
+}
 func ordered(issues map[string]*Issue) []*Issue {
 	result := []*Issue{}
 	for _, issue := range issues {
 		result = append(result, issue)
 	}
 	sort.Slice(result, func(i, j int) bool {
+		if result[i].Priority != result[j].Priority {
+			return result[i].Priority < result[j].Priority
+		}
 		if result[i].Created != result[j].Created {
 			return result[i].Created < result[j].Created
 		}

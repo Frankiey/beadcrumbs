@@ -6,6 +6,31 @@
       "type": "string",
       "pattern": "^bc-[0-9a-f]{12}4[0-9a-f]{3}[89ab][0-9a-f]{15}(?![\\s\\S])"
     },
+    "type": {
+      "enum": [
+        "task",
+        "bug",
+        "chore",
+        "docs",
+        "spike"
+      ]
+    },
+    "priority": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4
+    },
+    "epic": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^(?!(?:none|con|prn|aux|nul|com[0-9]|lpt[0-9])(?![\\s\\S]))[a-z0-9][a-z0-9-]{0,63}(?![\\s\\S])"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "title": {
       "type": "string",
       "minLength": 1
@@ -101,6 +126,9 @@
   },
   "required": [
     "id",
+    "type",
+    "priority",
+    "epic",
     "title",
     "description",
     "acceptance_criteria",

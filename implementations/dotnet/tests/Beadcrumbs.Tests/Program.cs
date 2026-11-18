@@ -17,7 +17,7 @@ try
     Store.Locked(root, true, () =>
     {
         Store.Initialize(root);
-        JsonNode Call(params string[] args) => Commands.Run(Arguments.Parse(args), root, Store.Load(root, codec), codec);
+        JsonNode Call(params string[] args) => Commands.Run(Arguments.Parse(args), root, Store.Load(root, codec), Store.LoadEpics(root), codec);
         var issue = Call("--create", "Alternate");
         string id = issue["id"]!.GetValue<string>();
         var claim = Call("--claim", id, "--agent", "worker");

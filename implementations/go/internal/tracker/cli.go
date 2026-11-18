@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -13,7 +14,9 @@ import (
 	"unicode/utf8"
 )
 
-var actionNames = []string{"init", "create", "show", "list", "ready", "blocked", "validate", "claim", "note", "release", "close", "board", "help", "version"}
+var actionNames = []string{"init", "create", "show", "list", "ready", "blocked", "validate", "claim", "note", "release", "close", "set-epic", "create-epic", "edit-epic", "show-epic", "epics", "board", "help", "version"}
+var issueActions = []string{"show", "claim", "note", "release", "close", "set-epic"}
+var epicActions = []string{"create-epic", "edit-epic", "show-epic"}
 
 func contains(items []string, value string) bool {
 	for _, item := range items {
@@ -33,7 +36,7 @@ type Arguments struct {
 
 func parse(argv []string) (Arguments, error) {
 	args := Arguments{Options: map[string]string{}, Dependencies: []string{}}
-	values := []string{"create", "show", "claim", "note", "release", "close", "workspace", "state", "agent", "token", "text", "description", "description-file", "acceptance-criteria", "depends-on"}
+	values := append([]string{"create", "workspace", "state", "agent", "token", "text", "description", "description-file", "acceptance-criteria", "depends-on", "type", "priority", "epic", "title"}, append(issueActions, epicActions...)...)
 	for i := 0; i < len(argv); i++ {
 		word := argv[i]
 		if !strings.HasPrefix(word, "--") {
@@ -77,8 +80,10 @@ func parse(argv []string) (Arguments, error) {
 		return args, failure(2, "action required")
 	}
 	allowed := map[string][]string{
-		"create": {"depends-on", "description", "description-file", "acceptance-criteria"},
-		"list":   {"state"}, "claim": {"agent"}, "note": {"agent", "text"}, "release": {"token"}, "close": {"token"},
+		"create": {"depends-on", "description", "description-file", "acceptance-criteria", "type", "priority", "epic"},
+		"list":   {"state", "type", "epic"}, "ready": {"type", "epic"}, "claim": {"agent"}, "note": {"agent", "text"},
+		"release": {"token"}, "close": {"token"}, "set-epic": {"epic"},
+		"create-epic": {"title", "description", "description-file"}, "edit-epic": {"description", "description-file"},
 	}
 	for key := range args.Options {
 		if key == args.Action || contains(allowed[args.Action], key) {
@@ -89,8 +94,32 @@ func parse(argv []string) (Arguments, error) {
 		}
 		return args, failure(2, "option does not apply")
 	}
-	if contains([]string{"show", "claim", "note", "release", "close"}, args.Action) && !idRE.MatchString(args.Value) {
+	if contains(issueActions, args.Action) && !idRE.MatchString(args.Value) {
 		return args, failure(2, "invalid ID")
+	}
+	if contains(epicActions, args.Action) && !epicKey(args.Value) {
+		return args, failure(2, "invalid epic key")
+	}
+	if kind, ok := args.Options["type"]; ok && !contains(issueTypes, kind) {
+		return args, failure(2, "invalid type")
+	}
+	if priority, ok := args.Options["priority"]; ok && (len(priority) != 1 || priority[0] < '0' || priority[0] > '4') {
+		return args, failure(2, "priority must be 0 through 4")
+	}
+	epic, hasEpic := args.Options["epic"]
+	if args.Action == "set-epic" && !hasEpic {
+		return args, failure(2, "--epic is required")
+	}
+	if hasEpic && epic != "none" && !epicKey(epic) {
+		return args, failure(2, "invalid epic key")
+	}
+	if title, ok := args.Options["title"]; args.Action == "create-epic" && (!ok || title == "") {
+		return args, failure(2, "--title is required")
+	}
+	_, hasDescription := args.Options["description"]
+	_, hasFile := args.Options["description-file"]
+	if args.Action == "edit-epic" && !hasDescription && !hasFile {
+		return args, failure(2, "a new description is required")
 	}
 	if args.Action == "create" && args.Value == "" {
 		return args, failure(2, "empty title")
@@ -159,61 +188,132 @@ func cell(value string) string {
 	}
 	return out.String()
 }
-func renderBoard(issues map[string]*Issue, generated string) string {
-	names := []string{"Ready", "Blocked", "Claimed", "Closed"}
-	sections := map[string][]string{}
+func sortedEpicKeys(epics map[string]*Epic) []string {
+	keys := []string{}
+	for key := range epics {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
+}
+func renderBoard(issues map[string]*Issue, epics map[string]*Epic, generated string) string {
+	keys := append(sortedEpicKeys(epics), "")
+	groups := map[string][]*Issue{}
 	for _, issue := range ordered(issues) {
-		unresolved := blockers(issue, issues)
-		section := "Closed"
-		if issue.State == "claimed" {
-			section = "Claimed"
+		key := ""
+		if issue.Epic != nil {
+			key = *issue.Epic
 		}
-		if issue.State == "open" {
-			section = "Ready"
-			if len(unresolved) > 0 {
-				section = "Blocked"
+		groups[key] = append(groups[key], issue)
+	}
+	name := func(key string) string {
+		if key == "" {
+			return "No epic"
+		}
+		return cell(epics[key].Title) + " (" + key + ")"
+	}
+	lines := []string{"# Beadcrumbs board", "", "Generated at " + generated + ".", "", "Snapshot of the issue store. Regenerate with --board. Manual edits are replaced.", "",
+		"## Summary", "", "| Epic | Ready | Blocked | Claimed | Closed |", "| --- | --- | --- | --- | --- |"}
+	for _, key := range keys {
+		counts := []string{}
+		for _, state := range statuses {
+			count := 0
+			for _, issue := range groups[key] {
+				if status(issue, issues) == state {
+					count++
+				}
+			}
+			counts = append(counts, strconv.Itoa(count))
+		}
+		lines = append(lines, "| "+name(key)+" | "+strings.Join(counts, " | ")+" |")
+	}
+	lines = append(lines, "")
+	for _, key := range keys {
+		lines = append(lines, "## "+name(key), "")
+		if len(groups[key]) == 0 {
+			lines = append(lines, "No issues.", "")
+			continue
+		}
+		lines = append(lines, "| Status | ID | Type | Priority | Title | Agent | Blockers |", "| --- | --- | --- | --- | --- | --- | --- |")
+		for _, state := range statuses {
+			for _, issue := range groups[key] {
+				if status(issue, issues) != state {
+					continue
+				}
+				owner := "—"
+				if issue.Claim != nil {
+					owner = issue.Claim.Agent
+				}
+				deps := []string{}
+				for _, dep := range blockers(issue, issues) {
+					deps = append(deps, dep.ID+" ("+dep.State+")")
+				}
+				text := "—"
+				if len(deps) > 0 {
+					text = strings.Join(deps, ", ")
+				}
+				cells := []string{state, issue.ID, issue.Type, "P" + strconv.FormatInt(issue.Priority, 10), issue.Title, owner, text}
+				for i := range cells {
+					cells[i] = cell(cells[i])
+				}
+				lines = append(lines, "| "+strings.Join(cells, " | ")+" |")
 			}
 		}
-		owner := "—"
-		if issue.Claim != nil {
-			owner = issue.Claim.Agent
-		}
-		deps := []string{}
-		for _, dep := range unresolved {
-			deps = append(deps, dep.ID+" ("+dep.State+")")
-		}
-		text := "—"
-		if len(deps) > 0 {
-			text = strings.Join(deps, ", ")
-		}
-		sections[section] = append(sections[section], "| "+cell(issue.ID)+" | "+cell(issue.Title)+" | "+cell(owner)+" | "+cell(text)+" |")
-	}
-	lines := []string{"# Beadcrumbs board", "", "Generated at " + generated + ".", "", "Snapshot of the issue store. Regenerate with --board. Manual edits are replaced.", ""}
-	for _, name := range names {
-		rows := sections[name]
-		lines = append(lines, fmt.Sprintf("## %s (%d)", name, len(rows)), "")
-		if len(rows) == 0 {
-			lines = append(lines, "No issues.", "")
-		} else {
-			lines = append(lines, "| ID | Title | Agent | Blockers |", "| --- | --- | --- | --- |")
-			lines = append(lines, rows...)
-			lines = append(lines, "")
-		}
+		lines = append(lines, "")
 	}
 	return strings.Join(lines, "\n")
 }
-func run(args Arguments, root string, issues map[string]*Issue, codec Codec) (any, error) {
+func findEpic(key string, epics map[string]*Epic) (*Epic, error) {
+	if epics[key] == nil {
+		return nil, failure(3, "epic not found: "+key)
+	}
+	return epics[key], nil
+}
+func inScope(args Arguments, issue *Issue, epics map[string]*Epic) (bool, error) {
+	if kind, ok := args.Options["type"]; ok && issue.Type != kind {
+		return false, nil
+	}
+	epic, ok := args.Options["epic"]
+	if !ok {
+		return true, nil
+	}
+	if epic == "none" {
+		return issue.Epic == nil, nil
+	}
+	if _, err := findEpic(epic, epics); err != nil {
+		return false, err
+	}
+	return issue.Epic != nil && *issue.Epic == epic, nil
+}
+func saveEpic(root string, epic *Epic) (*Epic, error) {
+	if err := validateEpic(epic); err != nil {
+		return nil, err
+	}
+	data, err := encode(epic)
+	if err != nil {
+		return nil, err
+	}
+	return epic, publish(filepath.Join(root, "epics", epic.Key+".json"), data)
+}
+func run(args Arguments, root string, issues map[string]*Issue, epics map[string]*Epic, codec Codec) (any, error) {
 	now := func() string { return time.Now().UTC().Format("2006-01-02T15:04:05Z") }
 	switch args.Action {
 	case "init":
 		return map[string]any{"format": "beadcrumbs", "version": 1}, nil
 	case "validate":
-		return map[string]any{"valid": true, "issue_count": len(issues)}, nil
+		return map[string]any{"valid": true, "issue_count": len(issues), "epic_count": len(epics)}, nil
 	case "list", "ready":
 		result := []*Issue{}
 		for _, issue := range ordered(issues) {
 			state, filtered := args.Options["state"]
-			if args.Action == "list" && (!filtered || state == issue.State) || args.Action == "ready" && issue.State == "open" && len(blockers(issue, issues)) == 0 {
+			if args.Action == "list" && filtered && state != issue.State || args.Action == "ready" && status(issue, issues) != "ready" {
+				continue
+			}
+			keep, err := inScope(args, issue, epics)
+			if err != nil {
+				return nil, err
+			}
+			if keep {
 				result = append(result, issue)
 			}
 		}
@@ -221,22 +321,68 @@ func run(args Arguments, root string, issues map[string]*Issue, codec Codec) (an
 	case "blocked":
 		result := []any{}
 		for _, issue := range ordered(issues) {
-			deps := blockers(issue, issues)
-			if issue.State == "open" && len(deps) > 0 {
-				result = append(result, map[string]any{"issue": issue, "blockers": deps})
+			if status(issue, issues) == "blocked" {
+				result = append(result, map[string]any{"issue": issue, "blockers": blockers(issue, issues)})
 			}
 		}
 		return result, nil
+	case "epics":
+		result := []*Epic{}
+		for _, key := range sortedEpicKeys(epics) {
+			result = append(result, epics[key])
+		}
+		return result, nil
+	case "show-epic":
+		epic, err := findEpic(args.Value, epics)
+		if err != nil {
+			return nil, err
+		}
+		members := []*Issue{}
+		counts := map[string]int{}
+		for _, state := range statuses {
+			counts[state] = 0
+		}
+		for _, issue := range ordered(issues) {
+			if issue.Epic != nil && *issue.Epic == epic.Key {
+				members = append(members, issue)
+				counts[status(issue, issues)]++
+			}
+		}
+		return map[string]any{"epic": epic, "counts": counts, "issues": members}, nil
+	case "create-epic":
+		if epics[args.Value] != nil {
+			return nil, failure(4, "epic already exists")
+		}
+		if _, err := pathKind(filepath.Join(root, "epics", args.Value+".json"), false, true); err != nil {
+			return nil, err
+		}
+		created := now()
+		return saveEpic(root, &Epic{args.Value, args.Options["title"], args.Options["description"], created, created, 1})
+	case "edit-epic":
+		epic, err := findEpic(args.Value, epics)
+		if err != nil {
+			return nil, err
+		}
+		if epic.Description == args.Options["description"] {
+			return nil, failure(4, "epic is unchanged")
+		}
+		if epic.Revision >= maxRevision {
+			return nil, fmt.Errorf("revision exhausted")
+		}
+		epic.Description = args.Options["description"]
+		epic.Updated = now()
+		epic.Revision++
+		return saveEpic(root, epic)
 	case "board":
 		path := filepath.Join(filepath.Dir(root), "board.md")
 		if _, err := pathKind(path, false, true); err != nil {
 			return nil, err
 		}
 		generated := now()
-		if err := publish(path, []byte(renderBoard(issues, generated))); err != nil {
+		if err := publish(path, []byte(renderBoard(issues, epics, generated))); err != nil {
 			return nil, err
 		}
-		return map[string]any{"path": path, "issue_count": len(issues), "generated_at": generated}, nil
+		return map[string]any{"path": path, "issue_count": len(issues), "epic_count": len(epics), "generated_at": generated}, nil
 	}
 	var issue *Issue
 	if args.Action == "create" {
@@ -244,6 +390,22 @@ func run(args Arguments, root string, issues map[string]*Issue, codec Codec) (an
 			if issues[dep] == nil {
 				return nil, failure(3, "issue not found")
 			}
+		}
+		var epic *string
+		if key, ok := args.Options["epic"]; ok && key != "none" {
+			found, err := findEpic(key, epics)
+			if err != nil {
+				return nil, err
+			}
+			epic = &found.Key
+		}
+		kind := "task"
+		if value, ok := args.Options["type"]; ok {
+			kind = value
+		}
+		priority := defaultPriority
+		if value, ok := args.Options["priority"]; ok {
+			priority = int64(value[0] - '0')
 		}
 		id, err := token()
 		if err != nil {
@@ -258,7 +420,7 @@ func run(args Arguments, root string, issues map[string]*Issue, codec Codec) (an
 			id = "bc-" + id
 		}
 		created := now()
-		issue = &Issue{ID: id, Title: args.Value, Description: args.Options["description"], Acceptance: args.Options["acceptance-criteria"], State: "open", Dependencies: args.Dependencies, Notes: []Note{}, Created: created, Updated: created, Revision: 1}
+		issue = &Issue{ID: id, Type: kind, Priority: priority, Epic: epic, Title: args.Value, Description: args.Options["description"], Acceptance: args.Options["acceptance-criteria"], State: "open", Dependencies: args.Dependencies, Notes: []Note{}, Created: created, Updated: created, Revision: 1}
 	} else {
 		issue = issues[args.Value]
 		if issue == nil {
@@ -267,13 +429,25 @@ func run(args Arguments, root string, issues map[string]*Issue, codec Codec) (an
 		if args.Action == "show" {
 			return issue, nil
 		}
+		var target *string
 		if args.Action == "claim" {
-			if issue.State != "open" || len(blockers(issue, issues)) > 0 {
+			if status(issue, issues) != "ready" {
 				return nil, failure(4, "issue is not ready")
 			}
 		} else if args.Action == "close" || args.Action == "release" {
 			if issue.State != "claimed" || issue.Claim.Token != args.Options["token"] {
 				return nil, failure(4, "claim mismatch")
+			}
+		} else if args.Action == "set-epic" {
+			if key := args.Options["epic"]; key != "none" {
+				found, err := findEpic(key, epics)
+				if err != nil {
+					return nil, err
+				}
+				target = &found.Key
+			}
+			if (issue.Epic == nil) == (target == nil) && (target == nil || *issue.Epic == *target) {
+				return nil, failure(4, "issue epic is unchanged")
 			}
 		}
 		if issue.Revision >= maxRevision {
@@ -296,6 +470,8 @@ func run(args Arguments, root string, issues map[string]*Issue, codec Codec) (an
 		case "close":
 			issue.State = "closed"
 			issue.Claim = nil
+		case "set-epic":
+			issue.Epic = target
 		}
 		issue.Updated = updated
 		issue.Revision++
@@ -400,11 +576,11 @@ func execute(argv []string) (any, bool, error) {
 		if !exists {
 			return nil, fmt.Errorf("store uninitialized")
 		}
-		issues, err := load(root, codec)
+		issues, epics, err := load(root, codec)
 		if err != nil {
 			return nil, err
 		}
-		return run(args, root, issues, codec)
+		return run(args, root, issues, epics, codec)
 	})
 	return result, args.JSON, err
 }

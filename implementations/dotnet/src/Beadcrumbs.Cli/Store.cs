@@ -102,19 +102,45 @@ public static class Store
         {
             string name = Path.GetFileName(entry);
             if (name == ".writer.lock") continue;
-            if (name == "issues")
+            if (name is "issues" or "epics")
             {
                 PathKind(entry, true);
-                Model.Require(!Directory.EnumerateFileSystemEntries(entry).Any(), "Uninitialized issues directory is not empty");
+                Model.Require(!Directory.EnumerateFileSystemEntries(entry).Any(), "Uninitialized directory is not empty");
             }
             else if (name.StartsWith(".tmp-", StringComparison.Ordinal) && Model.Matches(Model.TokenPattern, name[5..])) PathKind(entry);
             else throw new Failure("Unexpected uninitialized content");
         }
         MakeDirectory(Path.Combine(root, "issues"));
+        MakeDirectory(Path.Combine(root, "epics"));
         Publish(Path.Combine(root, "store.json"), JsonWire.Encode(Manifest()));
     }
-    public static Dictionary<string, JsonObject> Load(string root, IIssueCodec codec)
+    public static SortedDictionary<string, JsonObject> LoadEpics(string root)
     {
+        string directory = Path.Combine(root, "epics");
+        PathKind(directory, true);
+        var epics = new SortedDictionary<string, JsonObject>(StringComparer.Ordinal);
+        foreach (string file in Directory.EnumerateFileSystemEntries(directory).Order(StringComparer.Ordinal))
+        {
+            string name = Path.GetFileName(file);
+            if (!name.EndsWith(".json", StringComparison.Ordinal)) continue;
+            PathKind(file);
+            var epic = JsonWire.Decode(File.ReadAllBytes(file));
+            Model.ValidateEpic(epic);
+            string key = Model.Field(epic, "key");
+            Model.Require(name == key + ".json", "Epic filename mismatch");
+            epics.Add(key, epic);
+        }
+        return epics;
+    }
+    public static void SaveEpic(string root, JsonObject epic)
+    {
+        Model.ValidateEpic(epic);
+        Publish(Path.Combine(root, "epics", Model.Field(epic, "key") + ".json"), JsonWire.Encode(epic));
+    }
+    public static Dictionary<string, JsonObject> Load(string root, IIssueCodec codec,
+        SortedDictionary<string, JsonObject>? epics = null)
+    {
+        epics ??= LoadEpics(root);
         string directory = Path.Combine(root, "issues");
         PathKind(directory, true);
         var issues = new Dictionary<string, JsonObject>(StringComparer.Ordinal);
@@ -127,6 +153,7 @@ public static class Store
             Model.Validate(issue);
             string id = Model.Field(issue, "id");
             Model.Require(name == codec.Filename(id), "Filename mismatch");
+            Model.Require(Model.Epic(issue) is not { } key || epics.ContainsKey(key), "Missing epic");
             issues.Add(id, issue);
         }
         var counts = new Dictionary<string, int>();

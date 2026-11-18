@@ -11,12 +11,12 @@ This proposal follows the [Beads source review](research/beads-feature-extractio
 | Foundation | Atomic publication and recovery | Interrupt before and after replacement. Readers see complete old or new records. Document manual lock recovery. | Already specified. |
 | Core draft 1 | Task brief and acceptance criteria | Create/show preserve multiline text and Unicode. An agent can retrieve enough context to perform and verify the task. | Required description and acceptance_criteria strings, empty at creation when omitted. Explicit conversion of earlier draft records. |
 | Core draft 1 | List and blocked explanations | List includes open, claimed, and closed issues under explicit filters. Blocked output names the unresolved dependency IDs and their states. | Specified in the CLI contract. |
+| Core draft 1 | Issue types, priority, and epics | Ready work is ordered by priority (0–4, default 2), then age. Each issue has a fixed type (`task`, `bug`, `chore`, `docs`, `spike`). Epics are separate records with a fixed key and title and an editable description. Issues move between epics with `--set-epic`. Lists filter by type and epic, and the board groups by epic. | Adopted into v1 without a version bump, since nothing had been released. New `epics/` directory and three issue fields. |
 | Core draft 1 | Local store validation | Report malformed records, unsupported versions, missing dependencies, and cycles. A healthy store returns success. Validation performs no repairs. | Specified shared validator and transient locking. |
 | Next | Claim next ready issue | Selection and claim happen under one lock, using the same eligibility and ordering as ready. Empty work has a defined success result. | New CLI action. Define retry behavior after ambiguous output. |
-| Next | Priority | Agents can order eligible work by priority with stable tie-breaking. | New field and revised ordering. Document defaults and valid values before adopting. |
 | Next | Editable task content | Edits preserve unrelated fields and reject an outdated expected revision. | New update command, revision guard, and explicit mutable fields. |
 | Next | Offline workflow context | Print supported commands and a bounded summary from the local store for a new agent session. | Read-only command with an output budget. |
-| Later | Labels, parent grouping, search | Demonstrated need for finding or grouping work beyond status and dependencies. | Specify field semantics and query rules first. |
+| Later | Labels, nested grouping, search | Demonstrated need for finding or grouping work beyond type, epic, status, and dependencies. | Specify field semantics and query rules first. |
 | Later | Import from Beads | Preview supported mappings and report every dropped field or relationship. Preserve originals and validate the complete resulting graph. | Dedicated migration design and fixtures pinned to export versions. |
 
 The adopted first release additions are small enough to retain full directory scans, one issue JSON file per task, and a single shared lock. A task description and acceptance criteria can live in the same record as its notes. List, blocked explanations, and validation can reuse the existing read and validation path.
@@ -26,7 +26,7 @@ Automatic lease expiry, replication, workflow templates, messaging, remote track
 ## Decisions needed before the protocol freezes
 
 1. Review the adopted task content and input rules against real agent workflows.
-2. Priority is deferred to the next increment. The current draft orders ready work by creation time and ID.
+2. Priority and type are fixed at creation, and only an issue's epic can change. Decide whether re-prioritizing needs its own command before the protocol freezes.
 3. Keep dependencies immutable and closed issues terminal for the first release. Any future editing or reopening proposal must define how already claimed dependents behave.
 4. Decide how retryable mutations identify an earlier successful request. The initial release can retain the documented inspect-before-retry procedure, while stronger idempotency requires additional protocol state.
 

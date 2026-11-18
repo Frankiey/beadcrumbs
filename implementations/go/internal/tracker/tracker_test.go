@@ -43,11 +43,11 @@ func TestAlternateCodecLifecycle(t *testing.T) {
 			if err != nil {
 				return nil, err
 			}
-			issues, err := load(root, codec)
+			issues, epics, err := load(root, codec)
 			if err != nil {
 				return nil, err
 			}
-			return run(args, root, issues, codec)
+			return run(args, root, issues, epics, codec)
 		}
 		result, err := execute("--create", "Alternate")
 		if err != nil {

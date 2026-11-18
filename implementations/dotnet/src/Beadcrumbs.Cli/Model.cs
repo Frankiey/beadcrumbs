@@ -17,6 +17,11 @@ public static class Model
     public const string TokenPattern = "[0-9a-f]{12}4[0-9a-f]{3}[89ab][0-9a-f]{15}";
     public const string IdPattern = "bc-" + TokenPattern;
     public const string AgentPattern = "[A-Za-z0-9][A-Za-z0-9._-]{0,63}";
+    // "none" clears an epic; the others are reserved device names on Windows.
+    public const string EpicPattern = "(?!(?:none|con|prn|aux|nul|com[0-9]|lpt[0-9])\\z)[a-z0-9][a-z0-9-]{0,63}";
+    public const long DefaultPriority = 2;
+    public static readonly string[] IssueTypes = ["task", "bug", "chore", "docs", "spike"];
+    public static readonly string[] Statuses = ["ready", "blocked", "claimed", "closed"];
     public static readonly UTF8Encoding Utf8 = new(false, true);
     public static readonly JsonSerializerOptions Pretty = new() { WriteIndented = true };
 
@@ -48,11 +53,15 @@ public static class Model
     }
     public static void Validate(JsonObject issue)
     {
-        Fields(issue, "id", "title", "description", "acceptance_criteria", "state", "depends_on",
-            "claim", "notes", "created_at", "updated_at", "revision");
-        foreach (var key in new[] { "id", "title", "description", "acceptance_criteria", "state", "created_at", "updated_at" })
+        Fields(issue, "id", "type", "priority", "epic", "title", "description", "acceptance_criteria", "state",
+            "depends_on", "claim", "notes", "created_at", "updated_at", "revision");
+        foreach (var key in new[] { "id", "type", "title", "description", "acceptance_criteria", "state", "created_at", "updated_at" })
             Scalar(Field(issue, key));
         Require(Matches(IdPattern, Field(issue, "id")), "Invalid ID");
+        Require(IssueTypes.Contains(Field(issue, "type")), "Invalid type");
+        Require(issue["priority"] is JsonValue priority && priority.TryGetValue<long>(out var level) &&
+            level >= 0 && level <= 4, "Invalid priority");
+        Require(issue["epic"] is null || Matches(EpicPattern, Field(issue, "epic")), "Invalid epic key");
         Require(Field(issue, "title").Length > 0, "Empty title");
         var state = Field(issue, "state");
         Require(state is "open" or "claimed" or "closed", "Invalid state");
@@ -80,6 +89,26 @@ public static class Model
         Require(issue["revision"] is JsonValue revision && revision.TryGetValue<long>(out var number) &&
             number >= 1 && number <= MaxRevision, "Invalid revision");
     }
+    public static void ValidateEpic(JsonObject epic)
+    {
+        Fields(epic, "key", "title", "description", "created_at", "updated_at", "revision");
+        foreach (var key in new[] { "key", "title", "description", "created_at", "updated_at" })
+            Scalar(Field(epic, key));
+        Require(Matches(EpicPattern, Field(epic, "key")), "Invalid epic key");
+        Require(Field(epic, "title").Length > 0, "Empty title");
+        Timestamp(Field(epic, "created_at"));
+        Timestamp(Field(epic, "updated_at"));
+        Require(epic["revision"] is JsonValue revision && revision.TryGetValue<long>(out var number) &&
+            number >= 1 && number <= MaxRevision, "Invalid revision");
+    }
+    public static long Priority(JsonObject issue) => issue["priority"]!.GetValue<long>();
+    public static string? Epic(JsonObject issue) => issue["epic"] is null ? null : Field(issue, "epic");
+    public static string Status(JsonObject issue, Dictionary<string, JsonObject> issues) =>
+        Field(issue, "state") switch
+        {
+            "open" => Blockers(issue, issues).Count == 0 ? "ready" : "blocked",
+            var state => state,
+        };
     public static string[] Dependencies(JsonObject issue) => ((JsonArray)issue["depends_on"]!).Select(Text).ToArray();
     public static JsonArray Blockers(JsonObject issue, Dictionary<string, JsonObject> issues)
     {
@@ -90,7 +119,7 @@ public static class Model
         return result;
     }
     public static IEnumerable<JsonObject> Ordered(Dictionary<string, JsonObject> issues) =>
-        issues.Values.OrderBy(issue => Field(issue, "created_at"), StringComparer.Ordinal)
+        issues.Values.OrderBy(Priority).ThenBy(issue => Field(issue, "created_at"), StringComparer.Ordinal)
             .ThenBy(issue => Field(issue, "id"), StringComparer.Ordinal);
 }
 
