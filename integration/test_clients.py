@@ -78,6 +78,9 @@ def main():
         (output / (name + ".log")).write_text(log, encoding="utf-8")
         checks.append({"name": name, "suite": suite, "exit": code})
         print(f"{name}: {'passed' if code == 0 else 'FAILED'}", flush=True)
+        if code:
+            failing = [line for line in log.splitlines() if not line.endswith("... ok")]
+            print("\n".join(f"    {line}" for line in failing[-60:]), flush=True)
     summary = {
         "status": "passed" if all(item["exit"] == 0 for item in checks) else "failed",
         "clients": clients,

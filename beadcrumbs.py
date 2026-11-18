@@ -225,6 +225,19 @@ def publish_bytes(path, payload):
         scratch.unlink(missing_ok=True)
 
 
+def lock_pending_removal(lock):
+    """Windows denies access to a directory while another process is still removing it."""
+    if os.name != "nt":
+        return False
+    try:
+        lock.lstat()
+    except PermissionError:
+        return True
+    except FileNotFoundError:
+        return False
+    return True
+
+
 @contextmanager
 def store_lock(root, initialize):
     if initialize:
@@ -233,13 +246,27 @@ def store_lock(root, initialize):
     manifest_exists = read_manifest(root)
     lock = root / ".writer.lock"
     if not manifest_exists and not initialize:
-        if path_kind(lock, directory=True, optional=True):
+        try:
+            locked = path_kind(lock, directory=True, optional=True)
+        except PermissionError:
+            if not lock_pending_removal(lock):
+                raise
+            locked = True
+        if locked:
             raise Failure("Store is busy", 5)
         require(read_manifest(root), "Store is uninitialized")
     try:
         lock.mkdir(mode=0o700)
     except FileExistsError:
-        path_kind(lock, directory=True)
+        try:
+            path_kind(lock, directory=True)
+        except PermissionError:
+            if not lock_pending_removal(lock):
+                raise
+        raise Failure("Store is busy", 5) from None
+    except PermissionError:
+        if not lock_pending_removal(lock):
+            raise
         raise Failure("Store is busy", 5) from None
     try:
         yield

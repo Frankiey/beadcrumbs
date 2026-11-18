@@ -142,6 +142,7 @@ jobs:
         with:
           name: client-matrix-logs
           path: integration/.runs/
+          include-hidden-files: true
           retention-days: 7
 
   ci-passed:

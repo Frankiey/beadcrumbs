@@ -148,7 +148,15 @@ class CliTests(unittest.TestCase):
         file.write_bytes(text.encode())
         issue = self.value("--create", "File", "--description-file", str(file))
         self.assertEqual(issue["description"], text)
-        result = self.call("--create", "Stdin", "--description-file", "-", "--json", stdin="你好\n")
+        # Send bytes: a text-mode pipe would translate LF to CRLF on Windows.
+        result = subprocess.run(
+            [*COMMAND, "--create", "Stdin", "--description-file", "-", "--json"],
+            cwd=self.workspace,
+            input="你好\n".encode(),
+            capture_output=True,
+            timeout=20,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(json.loads(result.stdout)["description"], "你好\n")
         self.init()
         self.assertEqual(self.value("--show", issue["id"]), issue)
