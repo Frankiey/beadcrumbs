@@ -69,7 +69,7 @@ class CliTests(unittest.TestCase):
         self.assertEqual(list(self.workspace.iterdir()), [])
 
     def test_shared_fixtures(self):
-        cases = json.loads((ROOT / "tests/fixtures/cases.json").read_text())
+        cases = json.loads((ROOT / "tests/fixtures/cases.json").read_text(encoding="utf-8"))
         for case in cases:
             with self.subTest(case=case["name"]), tempfile.TemporaryDirectory() as folder:
                 old = self.workspace
@@ -269,7 +269,7 @@ class CliTests(unittest.TestCase):
         extra = store / "important.txt"
         extra.write_text("preserve")
         self.call("--init", code=1)
-        self.assertEqual(extra.read_text(), "preserve")
+        self.assertEqual(extra.read_text(encoding="utf-8"), "preserve")
 
     def test_simultaneous_initialization(self):
         processes = [
@@ -331,7 +331,7 @@ class CliTests(unittest.TestCase):
         self.assertEqual(result["path"], str(path.resolve()))
         self.assertEqual((result["issue_count"], result["epic_count"]), (0, 0))
         self.assertFalse((self.workspace / "board.md").exists())
-        content = path.read_text()
+        content = path.read_text(encoding="utf-8")
         self.assertIn("| No epic | 0 | 0 | 0 | 0 |", content)
         self.assertIn("## No epic\n\nNo issues.", content)
         self.assertIn(result["generated_at"], content)
@@ -351,7 +351,7 @@ class CliTests(unittest.TestCase):
         before = {p.name: p.read_bytes() for p in files.iterdir()}
         self.value("--board")
         path = self.workspace / "board.md"
-        content = path.read_text()
+        content = path.read_text(encoding="utf-8")
         self.assertIn("| No epic | 0 | 1 | 1 | 1 |", content)
         self.assertIn("| Work (work) | 1 | 0 | 0 | 0 |", content)
         self.assertIn("## Empty &#60;b&#62;epic&#60;/b&#62; (empty)\n\nNo issues.", content)
@@ -365,9 +365,9 @@ class CliTests(unittest.TestCase):
         self.assertEqual(before, {p.name: p.read_bytes() for p in files.iterdir()})
         token = self.value("--claim", first["id"], "--agent", "worker")["claim"]["token"]
         self.value("--close", first["id"], "--token", token)
-        self.assertEqual(path.read_text(), content)
+        self.assertEqual(path.read_text(encoding="utf-8"), content)
         self.value("--board")
-        self.assertIn("| No epic | 1 | 0 | 1 | 1 |", path.read_text())
+        self.assertIn("| No epic | 1 | 0 | 1 | 1 |", path.read_text(encoding="utf-8"))
         self.assertIn(dependent["id"], self.value("--ready")[0]["id"])
 
     def test_board_failure_preserves_previous_snapshot(self):
@@ -390,7 +390,7 @@ class CliTests(unittest.TestCase):
         target.write_text("Keep me")
         (self.workspace / "board.md").symlink_to(target)
         self.call("--board", code=1)
-        self.assertEqual(target.read_text(), "Keep me")
+        self.assertEqual(target.read_text(encoding="utf-8"), "Keep me")
 
     @unittest.skipIf(os.name == "nt", "POSIX FIFO test")
     def test_fifo_issue_is_rejected_without_blocking(self):

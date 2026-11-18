@@ -49,9 +49,9 @@ class InteroperabilityTests(unittest.TestCase):
         self.call(PRIMARY, "--close", second["id"], "--token", fresh["claim"]["token"])
         self.assertEqual(self.call(PRIMARY, "--list"), self.call(PEER, "--list"))
         self.call(PEER, "--board")
-        first_board = (self.workspace / "board.md").read_text().splitlines()
+        first_board = (self.workspace / "board.md").read_text(encoding="utf-8").splitlines()
         self.call(PRIMARY, "--board")
-        second_board = (self.workspace / "board.md").read_text().splitlines()
+        second_board = (self.workspace / "board.md").read_text(encoding="utf-8").splitlines()
         self.assertEqual(
             [line for line in first_board if not line.startswith("Generated at ")],
             [line for line in second_board if not line.startswith("Generated at ")],
@@ -72,9 +72,9 @@ class InteroperabilityTests(unittest.TestCase):
         self.assertEqual(self.call(PEER, "--show-epic", "shared"), self.call(PRIMARY, "--show-epic", "shared"))
         self.assertEqual(self.call(PEER, "--ready", "--type", "bug", "--epic", "shared"), [bug])
         self.call(PEER, "--board")
-        first_board = (self.workspace / "board.md").read_text().splitlines()
+        first_board = (self.workspace / "board.md").read_text(encoding="utf-8").splitlines()
         self.call(PRIMARY, "--board")
-        second_board = (self.workspace / "board.md").read_text().splitlines()
+        second_board = (self.workspace / "board.md").read_text(encoding="utf-8").splitlines()
         self.assertEqual(
             [line for line in first_board if not line.startswith("Generated at ")],
             [line for line in second_board if not line.startswith("Generated at ")],
