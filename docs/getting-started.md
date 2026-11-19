@@ -122,7 +122,7 @@ python3 beadcrumbs.py --blocked --json | jq '.[] | {title: .issue.title, blocker
 }
 ```
 
-Other read commands are `--show ID` for one issue, `--list` for all issues, and `--show-epic orders-v2` for an epic with its status counts. `--list` and `--ready` accept `--type TYPE` and `--epic KEY` (or `--epic none`) filters, and `--list` also accepts `--state open|claimed|closed`.
+Other read commands are `--show ID` for one issue, `--list` for all issues, and `--show-epic orders-v2` for an epic with its status counts. `--list` and `--ready` accept `--type TYPE`, `--epic KEY` (or `--epic none`), and repeatable `--label LABEL` filters, and `--list` also accepts `--state open|claimed|closed`.
 
 ## 4. Claim, take notes, and close
 

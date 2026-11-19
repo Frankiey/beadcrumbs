@@ -135,7 +135,7 @@ flowchart LR
 | `--claim` | ⚠️ | `--show`: is it already claimed by you? Your token is in the record. |
 | `--release` / `--close` | ✅ | A repeat fails with exit 4 and changes nothing. |
 | `--note` | ❌ | `--show`: is the last note already yours? |
-| `--set-epic` / `--edit-epic` | ✅ | A repeat fails with exit 4 and changes nothing. |
+| `--set-epic` / `--relabel` / `--edit-epic` | ✅ | A repeat fails with exit 4 and changes nothing. |
 | `--create` | ❌ | `--list`: does an identical title already exist? |
 
 ## Recovering from crashes
@@ -164,6 +164,7 @@ python3 beadcrumbs.py --create "Add retry to payment webhook" \
 - Model ordering with `--depends-on` rather than prose ("do this after X"). Agents then pick it up automatically when it becomes ready.
 - Use `--priority 0`–`4` for urgency among ready work, and `--type` to separate bugs and chores from feature work. Neither blocks anything.
 - Group related issues into an epic (`--create-epic KEY --title …`, then `--epic KEY` on create or `--set-epic` later), and check progress with `--show-epic KEY`.
+- Tag cross-cutting concerns with labels (`--label backend --label security`), and let agents pick a lane with `--ready --label backend`. Labels can be changed at any time with `--relabel`.
 - Fan out with several issues that depend on a single design issue, and fan in with one issue that depends on all of them.
 
 ```mermaid

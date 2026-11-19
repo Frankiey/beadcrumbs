@@ -5,27 +5,28 @@ The v1 draft 1 [core contract](core-contract.md) reference interface uses one ac
 | Action | Result |
 | --- | --- |
 | `--init` | Create an empty store in the selected workspace. Succeed without changing an already initialized, valid v1 store. |
-| `--create TITLE [--type TYPE] [--priority N] [--epic KEY] [--depends-on ID ...]` | Create an open issue and return it. Repeat `--depends-on` for each dependency. |
+| `--create TITLE [--type TYPE] [--priority N] [--epic KEY] [--label LABEL ...] [--depends-on ID ...]` | Create an open issue and return it. Repeat `--depends-on` for each dependency and `--label` for each label. |
 | `--show ID` | Return the issue. |
-| `--list [--state STATE] [--type TYPE] [--epic KEY\|none]` | Return all issues, optionally filtered by state, type, or epic. |
+| `--list [--state STATE] [--type TYPE] [--epic KEY\|none] [--label LABEL ...]` | Return all issues, optionally filtered by state, type, epic, or labels. |
 | `--blocked` | Return blocked open issues with their unresolved direct dependencies. |
 | `--validate` | Validate the entire store and return a success result. |
 | `--board` | Write board.md in the selected workspace and return snapshot metadata. |
-| `--ready [--type TYPE] [--epic KEY\|none]` | Return the ordered list of ready issues, optionally filtered. |
+| `--ready [--type TYPE] [--epic KEY\|none] [--label LABEL ...]` | Return the ordered list of ready issues, optionally filtered. |
 | `--claim ID --agent LABEL` | Claim a ready issue and return its new record, including the claim token. |
 | `--note ID --agent LABEL --text TEXT` | Append a note to an existing issue and return its new record. |
 | `--release ID --token TOKEN` | Clear a matching claim, return the issue to open, and return its new record. |
 | `--close ID --token TOKEN` | Clear a matching claim, close the issue, and return its new record. |
 | `--set-epic ID --epic KEY\|none` | Move an issue in any state into an epic, or out of one with `none`, and return its new record. No claim token is needed. |
+| `--relabel ID [--add LABEL ...] [--remove LABEL ...]` | Add and remove labels on an issue in any state and return its new record. No claim token is needed. |
 | `--create-epic KEY --title TITLE` | Create an epic and return it. Accepts `--description` or `--description-file`. |
 | `--edit-epic KEY` | Replace an epic's description from `--description` or `--description-file` and return the epic. The key and title are fixed. |
 | `--show-epic KEY` | Return the epic, its issue counts by status, and its issues. |
 | `--epics` | Return all epics, sorted by key. |
 | `--help`, `--version` | Print usage or client release version, respectively. These actions stand alone and do not access the workspace. |
 
-TYPE is one of `task`, `bug`, `chore`, `docs`, or `spike`, and defaults to `task`. N is a single digit from `0` (most urgent) through `4`, and defaults to `2`. An epic filter of `none` selects issues without an epic. An unknown epic in a filter, create, or set-epic is exit 3.
+TYPE is one of `task`, `bug`, `chore`, `docs`, or `spike`, and defaults to `task`. N is a single digit from `0` (most urgent) through `4`, and defaults to `2`. An epic filter of `none` selects issues without an epic. An unknown epic in a filter, create, or set-epic is exit 3. LABEL matches `^[a-z0-9][a-z0-9-]{0,63}$`. Labels need no registration. Repeating `--label` in a filter selects issues that have every given label. Relabel needs at least one `--add` or `--remove`, and a label cannot appear in both. Adding a label the issue already has, or removing one it lacks, is ignored, but a relabel that changes nothing is exit 4. So is a relabel that would leave more than 32 labels.
 
-`--workspace PATH` selects an existing directory and defaults to the current directory. `--json` selects machine-readable output for any store action. Repeat only `--depends-on`. Reject duplicate dependency IDs. Options apply only to the action that declares them. Reject unknown, repeated, or inapplicable options before accessing the store. Supply option values that begin with a dash using `--option=value`.
+`--workspace PATH` selects an existing directory and defaults to the current directory. `--json` selects machine-readable output for any store action. Repeat only `--depends-on`, `--label`, `--add`, and `--remove`. Reject duplicate values within each of them. Options apply only to the action that declares them. Reject unknown, repeated, or inapplicable options before accessing the store. Supply option values that begin with a dash using `--option=value`.
 
 ## Output
 
@@ -41,7 +42,7 @@ For failures detected before output begins, stdout is empty and stderr contains 
 | 1 | I/O failure, missing or invalid store, unsupported version, or exhausted revision. |
 | 2 | Invalid invocation, including malformed arguments and missing required options. |
 | 3 | Issue or epic not found, including a dependency or epic supplied to create. |
-| 4 | Issue state conflict, claim token mismatch, existing epic key, or a set-epic or edit-epic that would change nothing. |
+| 4 | Issue state conflict, claim token mismatch, existing epic key, a set-epic, relabel, or edit-epic that would change nothing, or a relabel past 32 labels. |
 | 5 | Writer lock is busy. A later invocation may retry. |
 
 ## Workflow
@@ -49,7 +50,7 @@ For failures detected before output begins, stdout is empty and stderr contains 
 ```sh
 python3 beadcrumbs.py --init
 python3 beadcrumbs.py --create-epic offline-docs --title "Offline documentation"
-python3 beadcrumbs.py --create "Document the offline setup" --type docs --priority 1 --epic offline-docs
+python3 beadcrumbs.py --create "Document the offline setup" --type docs --priority 1 --epic offline-docs --label onboarding
 python3 beadcrumbs.py --ready --json
 python3 beadcrumbs.py --claim "$issue_id" --agent worker-01 --json
 python3 beadcrumbs.py --note "$issue_id" --agent worker-01 --text "Verified offline."
@@ -76,6 +77,6 @@ Validate command syntax and scalar argument formats first. Then check workspace 
 
 Run `python3 beadcrumbs.py --board` to replace board.md in the selected workspace with a UTF-8 Markdown snapshot. The workspace must have an initialized valid store. Existing regular board.md files are replaced, including manual edits. Linked files and non-file destinations fail with exit 1.
 
-The board starts with a Summary table: one row per epic in key order, then a final "No epic" row, each with Ready, Blocked, Claimed, and Closed counts. A section follows for each of those rows, headed by the epic title and key, or "No epic". Each section has one table with Status, ID, Type, Priority (`P0`–`P4`), Title, Agent, and unresolved Blockers columns. Rows are grouped by status in the order ready, blocked, claimed, closed, and use list order within a status. A section with no issues says "No issues.". Titles are escaped for Markdown tables and HTML, and line breaks become spaces. Claim tokens, descriptions, and notes are omitted.
+The board starts with a Summary table: one row per epic in key order, then a final "No epic" row, each with Ready, Blocked, Claimed, and Closed counts. A section follows for each of those rows, headed by the epic title and key, or "No epic". Each section has one table with Status, ID, Type, Priority (`P0`–`P4`), Title, Labels (comma-separated, or `—`), Agent, and unresolved Blockers columns. Rows are grouped by status in the order ready, blocked, claimed, closed, and use list order within a status. A section with no issues says "No issues.". Titles are escaped for Markdown tables and HTML, and line breaks become spaces. Claim tokens, descriptions, and notes are omitted.
 
 Generation validates and holds the store lock through atomic board publication. Successful generation preserves issue records and revisions. Normal issue operations do not refresh the board. The generated UTC timestamp identifies the snapshot. A failure before replacement preserves an existing board. An interrupted output response can follow successful publication, and regenerating is safe.

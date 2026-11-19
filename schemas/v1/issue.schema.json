@@ -31,6 +31,15 @@
         }
       ]
     },
+    "labels": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9][a-z0-9-]{0,63}(?![\\s\\S])"
+      },
+      "uniqueItems": true,
+      "maxItems": 32
+    },
     "title": {
       "type": "string",
       "minLength": 1
@@ -129,6 +138,7 @@
     "type",
     "priority",
     "epic",
+    "labels",
     "title",
     "description",
     "acceptance_criteria",

@@ -88,6 +88,10 @@ Yes. Create issues with `--priority 0` (most urgent) through `4`; the default is
 
 There's one kind of issue. Group related issues into an **epic**: a separate record with a key, a title, and an editable description. Create one with `--create-epic KEY --title TITLE`, assign issues with `--epic KEY` on create or `--set-epic ID --epic KEY` later, and see progress with `--show-epic KEY`. Epics have no state of their own and never block work; use `--depends-on` for ordering. Each issue also has a type (`task`, `bug`, `chore`, `docs`, or `spike`) for filtering.
 
+### Can I tag issues with labels?
+
+Yes. Labels are free-form lowercase tags such as `backend` or `needs-review`, up to 32 per issue, with no registry to set up. Add them with `--label` on create, change them any time with `--relabel ID --add LABEL --remove LABEL`, and filter with `--list --label X` or `--ready --label X`. Repeat `--label` to require every label. Use labels for cross-cutting concerns; use an epic when the issues belong to one deliverable.
+
 ### Can I use a store on a network share or Dropbox?
 
 Not supported in v1. The lock relies on atomic exclusive `mkdir` and same-directory rename semantics, which sync tools and many network filesystems don't guarantee. Use one machine and a local filesystem.

@@ -19,6 +19,8 @@ public static class Model
     public const string AgentPattern = "[A-Za-z0-9][A-Za-z0-9._-]{0,63}";
     // "none" clears an epic; the others are reserved device names on Windows.
     public const string EpicPattern = "(?!(?:none|con|prn|aux|nul|com[0-9]|lpt[0-9])\\z)[a-z0-9][a-z0-9-]{0,63}";
+    public const string LabelPattern = "[a-z0-9][a-z0-9-]{0,63}";
+    public const int MaxLabels = 32;
     public const long DefaultPriority = 2;
     public static readonly string[] IssueTypes = ["task", "bug", "chore", "docs", "spike"];
     public static readonly string[] Statuses = ["ready", "blocked", "claimed", "closed"];
@@ -53,7 +55,7 @@ public static class Model
     }
     public static void Validate(JsonObject issue)
     {
-        Fields(issue, "id", "type", "priority", "epic", "title", "description", "acceptance_criteria", "state",
+        Fields(issue, "id", "type", "priority", "epic", "labels", "title", "description", "acceptance_criteria", "state",
             "depends_on", "claim", "notes", "created_at", "updated_at", "revision");
         foreach (var key in new[] { "id", "type", "title", "description", "acceptance_criteria", "state", "created_at", "updated_at" })
             Scalar(Field(issue, key));
@@ -62,6 +64,11 @@ public static class Model
         Require(issue["priority"] is JsonValue priority && priority.TryGetValue<long>(out var level) &&
             level >= 0 && level <= 4, "Invalid priority");
         Require(issue["epic"] is null || Matches(EpicPattern, Field(issue, "epic")), "Invalid epic key");
+        var labels = Labels(issue);
+        Require(labels.Length <= MaxLabels, "Too many labels");
+        Require(labels.All(label => Matches(LabelPattern, label)) &&
+            labels.Zip(labels.Skip(1)).All(pair => string.CompareOrdinal(pair.First, pair.Second) < 0),
+            "Labels must be valid, distinct, and sorted");
         Require(Field(issue, "title").Length > 0, "Empty title");
         var state = Field(issue, "state");
         Require(state is "open" or "claimed" or "closed", "Invalid state");
@@ -102,6 +109,8 @@ public static class Model
             number >= 1 && number <= MaxRevision, "Invalid revision");
     }
     public static long Priority(JsonObject issue) => issue["priority"]!.GetValue<long>();
+    public static string[] Labels(JsonObject issue) =>
+        (issue["labels"] as JsonArray ?? throw new Failure("Invalid labels")).Select(Text).ToArray();
     public static string? Epic(JsonObject issue) => issue["epic"] is null ? null : Field(issue, "epic");
     public static string Status(JsonObject issue, Dictionary<string, JsonObject> issues) =>
         Field(issue, "state") switch

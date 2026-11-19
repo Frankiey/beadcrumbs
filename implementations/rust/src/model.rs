@@ -38,6 +38,7 @@ pub const MAX_REVISION: u64 = 9_007_199_254_740_991;
 pub const ISSUE_TYPES: &[&str] = &["task", "bug", "chore", "docs", "spike"];
 pub const STATUSES: &[&str] = &["ready", "blocked", "claimed", "closed"];
 pub const DEFAULT_PRIORITY: u64 = 2;
+pub const MAX_LABELS: usize = 32;
 pub fn require(condition: bool, message: &str) -> Result<()> {
     if condition {
         Ok(())
@@ -72,6 +73,15 @@ pub fn agent_valid(value: &str) -> bool {
             .bytes()
             .all(|b| b.is_ascii_alphanumeric() || b"._-".contains(&b))
 }
+pub fn label_valid(value: &str) -> bool {
+    let bytes = value.as_bytes();
+    !value.is_empty()
+        && value.len() <= 64
+        && (bytes[0].is_ascii_lowercase() || bytes[0].is_ascii_digit())
+        && bytes
+            .iter()
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || *b == b'-')
+}
 /// "none" clears an epic; the others are reserved device names on Windows.
 pub fn epic_key_valid(value: &str) -> bool {
     let bytes = value.as_bytes();
@@ -79,13 +89,7 @@ pub fn epic_key_valid(value: &str) -> bool {
         || (bytes.len() == 4
             && (value.starts_with("com") || value.starts_with("lpt"))
             && bytes[3].is_ascii_digit());
-    !value.is_empty()
-        && value.len() <= 64
-        && (bytes[0].is_ascii_lowercase() || bytes[0].is_ascii_digit())
-        && bytes
-            .iter()
-            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || *b == b'-')
-        && !reserved
+    label_valid(value) && !reserved
 }
 pub fn token() -> Result<String> {
     let mut bytes = [0u8; 16];
@@ -179,6 +183,7 @@ pub fn validate(issue: &Issue) -> Result<()> {
             "type",
             "priority",
             "epic",
+            "labels",
             "title",
             "description",
             "acceptance_criteria",
@@ -216,6 +221,19 @@ pub fn validate(issue: &Issue) -> Result<()> {
         issue["epic"].is_null() || issue["epic"].as_str().is_some_and(epic_key_valid),
         "Invalid epic key",
     )?;
+    let labels = issue["labels"]
+        .as_array()
+        .ok_or_else(|| Failure::new("Invalid labels", 1))?;
+    require(labels.len() <= MAX_LABELS, "Too many labels")?;
+    let mut previous: Option<&str> = None;
+    for label in labels {
+        let label = text(label)?;
+        require(
+            label_valid(label) && previous.is_none_or(|p| p < label),
+            "Labels must be valid, distinct, and sorted",
+        )?;
+        previous = Some(label);
+    }
     let state = field(issue, "state");
     require(
         ["open", "claimed", "closed"].contains(&state),

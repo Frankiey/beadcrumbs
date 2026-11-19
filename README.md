@@ -118,17 +118,18 @@ The layout on disk is deliberately boring:
         └── bc-dd1c3002451d4743aef78e6e6333d980.json
 ```
 
-## 🗂️ Issues and epics
+## 🗂️ Issues, epics, and labels
 
-Every issue is the same kind of record. There are no stories, sub-tasks, or parent issues. Three fields categorize work without changing how it flows:
+Every issue is the same kind of record. There are no stories, sub-tasks, or parent issues. Four fields categorize work without changing how it flows:
 
 | Field | Values | Set | Effect |
 | --- | --- | --- | --- |
 | `type` | `task` (default), `bug`, `chore`, `docs`, `spike` | At creation, fixed | Filter with `--type`; shown on the board |
 | `priority` | `0` (most urgent) to `4`, default `2` | At creation, fixed | `--ready`, `--list`, and `--blocked` sort by priority, then age |
 | `epic` | An epic key, or none | At creation, or later with `--set-epic` | Filter with `--epic KEY` or `--epic none`; the board groups by epic |
+| `labels` | Up to 32 free-form tags like `backend` or `needs-review` | At creation with `--label`, or later with `--relabel` | Filter with `--label`, repeated to require all; shown on the board |
 
-An **epic** is a small separate record: an immutable key and title, plus a description you can edit. It has no state; progress is counted from its issues.
+An **epic** is a small separate record: an immutable key and title, plus a description you can edit. It has no state; progress is counted from its issues. **Labels** need no setup: any lowercase slug works, and an issue can carry several.
 
 ```mermaid
 flowchart LR
@@ -145,9 +146,12 @@ python3 beadcrumbs.py --set-epic "$issue_id" --epic auth-rework   # or --epic no
 python3 beadcrumbs.py --ready --epic auth-rework --type bug
 python3 beadcrumbs.py --show-epic auth-rework                     # epic, status counts, issues
 python3 beadcrumbs.py --edit-epic auth-rework --description "Tokens everywhere."
+python3 beadcrumbs.py --create "Rate-limit login" --label backend --label security
+python3 beadcrumbs.py --relabel "$issue_id" --add needs-review --remove security
+python3 beadcrumbs.py --list --label backend --label needs-review       # issues with both labels
 ```
 
-Type, priority, and epic never affect readiness or claiming. Only `depends_on` blocks work.
+Type, priority, epic, and labels never affect readiness or claiming. Only `depends_on` blocks work.
 
 ## 🔄 Issue lifecycle
 
@@ -178,6 +182,7 @@ stateDiagram-v2
 | `--claim ID --agent LABEL` | Issue is open and every dependency is closed | `claimed`, new agent/token pair |
 | `--note ID --agent LABEL --text TEXT` | Issue exists | Appends an attributed, timestamped note |
 | `--set-epic ID --epic KEY\|none` | Issue exists and the epic changes | Moves the issue between epics, any state |
+| `--relabel ID --add L --remove L` | Issue exists and its labels change | Adds and removes labels, any state |
 | `--release ID --token TOKEN` | Claimed and token matches | Back to `open` |
 | `--close ID --token TOKEN` | Claimed and token matches | `closed` (terminal) |
 
@@ -270,15 +275,15 @@ This writes `board.md` in the workspace: a timestamped snapshot that starts with
 
 ## Auth rework (auth-rework)
 
-| Status | ID | Type | Priority | Title | Agent | Blockers |
-| --- | --- | --- | --- | --- | --- | --- |
-| ready | bc-dd1c3002451d4743aef78e6e6333d980 | bug | P0 | Fix login loop | — | — |
-| blocked | bc-5cba71133efc4e308ab5d490eec20268 | chore | P3 | Remove cookie code | — | bc-dd1c3002451d4743aef78e6e6333d980 (open) |
+| Status | ID | Type | Priority | Title | Labels | Agent | Blockers |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| ready | bc-dd1c3002451d4743aef78e6e6333d980 | bug | P0 | Fix login loop | backend, security | — | — |
+| blocked | bc-5cba71133efc4e308ab5d490eec20268 | chore | P3 | Remove cookie code | — | — | bc-dd1c3002451d4743aef78e6e6333d980 (open) |
 ```
 
 ## 🌐 Implementations
 
-Five independent clients share one protocol. None of them shells out to another, and all of them pass the same black-box CLI suite plus pairwise interoperability tests (**145/145 passing** on macOS).
+Five independent clients share one protocol. None of them shells out to another, and all of them pass the same black-box CLI suite plus pairwise interoperability tests (**150/150 passing** on macOS).
 
 | Client | Location | Runtime |
 | --- | --- | --- |
@@ -332,7 +337,7 @@ The suites cover competing claims across processes, stale tokens, simultaneous i
 | Atomic, race-safe claims | ✅ | ✅ | ❌ | ❌ |
 | Dependency-aware ready list | ✅ | ✅ | ⚠️ | ❌ |
 | Issue types, priorities, epics | ✅ (flat grouping) | ✅ (epics are issues) | ✅ | ❌ |
-| Labels | ❌ | ✅ | ✅ | ❌ |
+| Labels | ✅ (free-form, filterable) | ✅ | ✅ | ❌ |
 | Multi-machine sync | ❌ (out of scope for v1) | ✅ (Dolt remotes) | ✅ | ⚠️ via Git |
 
 Beadcrumbs grew out of a [feature review of Beads](docs/research/beads-feature-extraction.md). The Beads column reflects commit `d76ade2` (November 2026). It trades Beads' richer feature set for the smallest possible deployment footprint and a plain-file protocol that any language can implement.
@@ -355,6 +360,7 @@ The full map is in the **[documentation index](docs/README.md)**.
 - [x] Atomic publication and crash-interruption tests
 - [x] Markdown board
 - [x] Issue types, priorities, and epics
+- [x] Free-form labels with filtering
 - [x] Go, Rust, .NET, and TypeScript clients with a cross-client conformance matrix
 - [ ] Linux and Windows verification, plus minimum-toolchain checks
 - [ ] Freeze protocol v1

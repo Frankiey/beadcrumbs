@@ -34,12 +34,12 @@ export function renderBoard(issues: Map<string, Issue>, generated: string,
       lines.push("No issues.", "");
       continue;
     }
-    lines.push("| Status | ID | Type | Priority | Title | Agent | Blockers |",
-      "| --- | --- | --- | --- | --- | --- | --- |");
+    lines.push("| Status | ID | Type | Priority | Title | Labels | Agent | Blockers |",
+      "| --- | --- | --- | --- | --- | --- | --- | --- |");
     const rank = (issue: Issue): number => statuses.indexOf(status(issue, issues));
     for (const issue of [...members].sort((a, b) => rank(a) - rank(b))) {
       const columns = [status(issue, issues), issue.id, issue.type, "P" + issue.priority, issue.title,
-        issue.claim?.agent ?? "—",
+        issue.labels.join(", ") || "—", issue.claim?.agent ?? "—",
         blockers(issue, issues).map(item => item.id + " (" + item.state + ")").join(", ") || "—"];
       lines.push("| " + columns.map(cell).join(" | ") + " |");
     }
