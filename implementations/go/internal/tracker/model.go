@@ -26,6 +26,9 @@ var agentRE = regexp.MustCompile("^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 var timeRE = regexp.MustCompile("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$")
 
 var epicRE = regexp.MustCompile("^[a-z0-9][a-z0-9-]{0,63}$")
+var labelRE = epicRE
+
+const maxLabels = 32
 
 const maxRevision = int64(9007199254740991)
 const defaultPriority = int64(2)
@@ -60,6 +63,7 @@ type Issue struct {
 	Type         string   `json:"type"`
 	Priority     int64    `json:"priority"`
 	Epic         *string  `json:"epic"`
+	Labels       []string `json:"labels"`
 	Title        string   `json:"title"`
 	Description  string   `json:"description"`
 	Acceptance   string   `json:"acceptance_criteria"`
@@ -219,6 +223,14 @@ func validate(issue *Issue) error {
 		(issue.Epic != nil && !epicKey(*issue.Epic)) {
 		return fmt.Errorf("invalid issue fields")
 	}
+	if issue.Labels == nil || len(issue.Labels) > maxLabels {
+		return fmt.Errorf("invalid labels")
+	}
+	for i, label := range issue.Labels {
+		if !labelRE.MatchString(label) || (i > 0 && issue.Labels[i-1] >= label) {
+			return fmt.Errorf("labels must be valid, distinct, and sorted")
+		}
+	}
 	if issue.State == "claimed" {
 		if issue.Claim == nil || !agentRE.MatchString(issue.Claim.Agent) || !tokenRE.MatchString(issue.Claim.Token) {
 			return fmt.Errorf("invalid claim")
@@ -262,7 +274,7 @@ func (JSONCodec) Decode(data []byte) (*Issue, error) {
 	if err != nil {
 		return nil, err
 	}
-	if !exact(value, "id", "type", "priority", "epic", "title", "description", "acceptance_criteria", "state", "depends_on", "claim", "notes", "created_at", "updated_at", "revision") {
+	if !exact(value, "id", "type", "priority", "epic", "labels", "title", "description", "acceptance_criteria", "state", "depends_on", "claim", "notes", "created_at", "updated_at", "revision") {
 		return nil, fmt.Errorf("invalid issue fields")
 	}
 	object := value.(map[string]any)

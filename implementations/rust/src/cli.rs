@@ -20,6 +20,7 @@ const ACTIONS: &[&str] = &[
     "release",
     "close",
     "set-epic",
+    "relabel",
     "create-epic",
     "edit-epic",
     "show-epic",
@@ -28,17 +29,24 @@ const ACTIONS: &[&str] = &[
     "help",
     "version",
 ];
-const ISSUE_ACTIONS: &[&str] = &["show", "claim", "note", "release", "close", "set-epic"];
+const ISSUE_ACTIONS: &[&str] = &[
+    "show", "claim", "note", "release", "close", "set-epic", "relabel",
+];
+const REPEATABLE: &[&str] = &["depends-on", "label", "add", "remove"];
 const EPIC_ACTIONS: &[&str] = &["create-epic", "edit-epic", "show-epic"];
 pub struct Arguments {
     pub action: String,
     pub value: String,
     pub options: HashMap<String, String>,
     pub dependencies: Vec<String>,
+    pub repeated: HashMap<String, Vec<String>>,
 }
 impl Arguments {
     pub fn get(&self, key: &str) -> &str {
         self.options.get(key).map(String::as_str).unwrap_or("")
+    }
+    pub fn all(&self, key: &str) -> &[String] {
+        self.repeated.get(key).map(Vec::as_slice).unwrap_or(&[])
     }
 }
 pub fn parse(argv: &[String]) -> Result<Arguments> {
@@ -47,6 +55,7 @@ pub fn parse(argv: &[String]) -> Result<Arguments> {
         value: String::new(),
         options: HashMap::new(),
         dependencies: Vec::new(),
+        repeated: HashMap::new(),
     };
     let values = [
         "create",
@@ -56,9 +65,13 @@ pub fn parse(argv: &[String]) -> Result<Arguments> {
         "release",
         "close",
         "set-epic",
+        "relabel",
         "create-epic",
         "edit-epic",
         "show-epic",
+        "label",
+        "add",
+        "remove",
         "type",
         "priority",
         "epic",
@@ -88,7 +101,7 @@ pub fn parse(argv: &[String]) -> Result<Arguments> {
                 "Unknown option",
             )?;
             require(
-                name == "depends-on" || !args.options.contains_key(name),
+                REPEATABLE.contains(&name) || !args.options.contains_key(name),
                 "Repeated option",
             )?;
             let value = if values.contains(&name) {
@@ -113,6 +126,11 @@ pub fn parse(argv: &[String]) -> Result<Arguments> {
             }
             if name == "depends-on" {
                 args.dependencies.push(value.clone());
+            } else if REPEATABLE.contains(&name) {
+                args.repeated
+                    .entry(name.into())
+                    .or_default()
+                    .push(value.clone());
             }
             args.options.insert(name.into(), value);
             index += 1;
@@ -127,10 +145,12 @@ pub fn parse(argv: &[String]) -> Result<Arguments> {
                 "type",
                 "priority",
                 "epic",
+                "label",
             ],
-            "list" => &["state", "type", "epic"],
-            "ready" => &["type", "epic"],
+            "list" => &["state", "type", "epic", "label"],
+            "ready" => &["type", "epic", "label"],
             "set-epic" => &["epic"],
+            "relabel" => &["add", "remove"],
             "create-epic" => &["title", "description", "description-file"],
             "edit-epic" => &["description", "description-file"],
             "claim" => &["agent"],
@@ -194,6 +214,26 @@ pub fn parse(argv: &[String]) -> Result<Arguments> {
             require(
                 ["open", "claimed", "closed"].contains(&args.get("state")),
                 "Invalid state",
+            )?;
+        }
+        for name in ["label", "add", "remove"] {
+            let mut unique = std::collections::HashSet::new();
+            for label in args.all(name) {
+                require(label_valid(label) && unique.insert(label), "Invalid label")?;
+            }
+        }
+        require(args.all("label").len() <= MAX_LABELS, "Too many labels")?;
+        if action == "relabel" {
+            require(
+                !args.all("add").is_empty() || !args.all("remove").is_empty(),
+                "--add or --remove is required",
+            )?;
+            require(
+                !args
+                    .all("add")
+                    .iter()
+                    .any(|l| args.all("remove").contains(l)),
+                "A label cannot be both added and removed",
             )?;
         }
         let mut seen = std::collections::HashSet::new();
@@ -298,8 +338,8 @@ pub fn board(issues: &Issues, epics: &Epics, generated: &str) -> String {
             lines.push("".into());
             continue;
         }
-        lines.push("| Status | ID | Type | Priority | Title | Agent | Blockers |".into());
-        lines.push("| --- | --- | --- | --- | --- | --- | --- |".into());
+        lines.push("| Status | ID | Type | Priority | Title | Labels | Agent | Blockers |".into());
+        lines.push("| --- | --- | --- | --- | --- | --- | --- | --- |".into());
         for state in STATUSES {
             for issue in group.iter().filter(|issue| status(issue, issues) == *state) {
                 let owner = issue["claim"]
@@ -319,12 +359,21 @@ pub fn board(issues: &Issues, epics: &Epics, generated: &str) -> String {
                     .join(", ");
                 let deps = if deps.is_empty() { "—" } else { &deps };
                 let priority = format!("P{}", issue["priority"].as_u64().unwrap());
+                let tags = issue["labels"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|v| v.as_str().unwrap())
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                let tags = if tags.is_empty() { "—" } else { &tags };
                 let cells = [
                     *state,
                     field(issue, "id"),
                     field(issue, "type"),
                     &priority,
                     field(issue, "title"),
+                    tags,
                     owner,
                     deps,
                 ];
@@ -343,6 +392,10 @@ fn find_epic<'a>(key: &str, epics: &'a Epics) -> Result<&'a Epic> {
 }
 fn in_scope(args: &Arguments, issue: &Issue, epics: &Epics) -> Result<bool> {
     if args.options.contains_key("type") && field(issue, "type") != args.get("type") {
+        return Ok(false);
+    }
+    let labels = issue["labels"].as_array().unwrap();
+    if !args.all("label").iter().all(|l| labels.contains(&json!(l))) {
         return Ok(false);
     }
     match args.options.get("epic").map(String::as_str) {
@@ -472,8 +525,10 @@ pub fn run(
         while issues.contains_key(&id) {
             id = format!("bc-{}", token()?);
         }
+        let mut labels = args.all("label").to_vec();
+        labels.sort();
         let created = now()?;
-        issue=json!({"id":id,"type":kind,"priority":priority,"epic":epic,"title":args.value,"description":args.get("description"),
+        issue=json!({"id":id,"type":kind,"priority":priority,"epic":epic,"labels":labels,"title":args.value,"description":args.get("description"),
             "acceptance_criteria":args.get("acceptance-criteria"),"state":"open","depends_on":args.dependencies,"claim":null,
             "notes":[],"created_at":created,"updated_at":created,"revision":1})
             .as_object().unwrap().clone();
@@ -487,6 +542,7 @@ pub fn run(
         }
         let state = field(&issue, "state");
         let mut target = Value::Null;
+        let mut labels: Vec<String> = Vec::new();
         if args.action == "claim" {
             if status(&issue, issues) != "ready" {
                 return Err(Failure::new("Issue is not ready", 4));
@@ -501,6 +557,27 @@ pub fn run(
             }
             if issue["epic"] == target {
                 return Err(Failure::new("Issue epic is unchanged", 4));
+            }
+        } else if args.action == "relabel" {
+            let current: Vec<String> = issue["labels"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|v| v.as_str().unwrap().to_string())
+                .collect();
+            labels = current
+                .iter()
+                .chain(args.all("add"))
+                .filter(|l| !args.all("remove").contains(l))
+                .cloned()
+                .collect();
+            labels.sort();
+            labels.dedup();
+            if labels == current {
+                return Err(Failure::new("Issue labels are unchanged", 4));
+            }
+            if labels.len() > MAX_LABELS {
+                return Err(Failure::new("Too many labels", 4));
             }
         }
         let revision = issue["revision"].as_u64().unwrap();
@@ -533,6 +610,9 @@ pub fn run(
             }
             "set-epic" => {
                 issue.insert("epic".into(), target);
+            }
+            "relabel" => {
+                issue.insert("labels".into(), json!(labels));
             }
             _ => return Err(Failure::new("Unsupported action", 2)),
         }

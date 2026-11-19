@@ -15,17 +15,17 @@ Draft v1 supports cooperating processes sharing one physical store on one machin
 | Capability | Required behavior |
 | --- | --- |
 | Initialize | Create a versioned manifest and the issue and epic directories. Repeating initialization on a valid store preserves its data. |
-| Create | Persist a title, type, priority, optional epic, description, acceptance criteria, and optional blocking dependencies. Return the full created issue. |
-| Group | Create epics, edit an epic's description, list epics, show an epic with its issues and status counts, and move an issue into or out of an epic. |
+| Create | Persist a title, type, priority, optional epic, labels, description, acceptance criteria, and optional blocking dependencies. Return the full created issue. |
+| Group | Create epics, edit an epic's description, list epics, show an epic with its issues and status counts, and move an issue into or out of an epic. Add and remove free-form labels on an issue. |
 | Board | Generate a Markdown snapshot of all issues, grouped by epic, in workspace-level board.md. |
-| Inspect | Show an issue, list issues, list ready work in priority order, filter lists by type and epic, and explain blocked open issues through unresolved dependency IDs and states. |
+| Inspect | Show an issue, list issues, list ready work in priority order, filter lists by type, epic, and labels, and explain blocked open issues through unresolved dependency IDs and states. |
 | Claim | Claim only ready work, with eligibility checked while holding the store lock. Return the newly assigned claim token. |
 | Record progress | Append an attributed note in any state. |
 | Release | Require the current claim token, clear the claim, and return the issue to open. |
 | Close | Require the current claim token, clear the claim, and make the issue terminal. |
 | Validate | Check the entire store using the same rules as normal operations. Return a successful validation result or a nonzero failure. |
 
-Descriptions and acceptance criteria are adopted into this draft as immutable strings with empty defaults at creation. List, blocked, and validate are adopted as core commands. Issue types, priority, and epics are adopted as categorization: they order and group work but never change readiness. Editable issue content, automatic claim-next, expiring claims, labels, nested hierarchy, and import remain future proposals.
+Descriptions and acceptance criteria are adopted into this draft as immutable strings with empty defaults at creation. List, blocked, and validate are adopted as core commands. Issue types, priority, epics, and labels are adopted as categorization: they order, group, and tag work but never change readiness. Editable issue content, automatic claim-next, expiring claims, nested hierarchy, search, and import remain future proposals.
 
 ## Identity and state
 
@@ -41,10 +41,11 @@ Claim tokens identify assignments and MUST be freshly generated for each success
 | Claim | Issue is open and ready. | State claimed and new agent/token pair. |
 | Note | Issue exists in any state. | Append one note. |
 | Set epic | Issue exists in any state, the epic exists or is `none`, and the value changes. | Replace the epic key, or set it to null. |
+| Relabel | Issue exists in any state, the resulting label set differs, and has at most 32 labels. | Replace the labels with the sorted result of adding and removing. |
 | Release | State claimed and token matches. | State open and null claim. |
 | Close | State claimed and token matches. | State closed and null claim. |
 
-Each successful mutation of an existing issue MUST increment revision once and update its mutation timestamp. A rejected mutation MUST preserve authoritative records. Repeating claim, release, close, set-epic, or edit-epic after the change is a conflict. Notes require attribution but no claim token. Set-epic requires neither.
+Each successful mutation of an existing issue MUST increment revision once and update its mutation timestamp. A rejected mutation MUST preserve authoritative records. Repeating claim, release, close, set-epic, relabel, or edit-epic after the change is a conflict. Notes require attribution but no claim token. Set-epic and relabel require neither.
 
 Epic keys MUST match the protocol key pattern and are validated before constructing a path. Creating an epic whose key exists is a conflict. Editing an epic replaces only its description and increments its revision.
 
@@ -60,7 +61,7 @@ An abandoned lock requires all clients to stop before manual removal. Process-in
 
 ## Compatibility
 
-The manifest version governs record shape, validation, and coordination semantics. Unsupported versions MUST be rejected before creating a lock or scratch file. Unknown fields are invalid. Draft 1 adds description and acceptance criteria, and later type, priority, epic, and the epics directory, to the earlier unreleased draft. Because no release had been announced, these stayed within version 1 instead of bumping it. Earlier hand-authored records missing these fields fail validation and require an explicit offline edit adding the defaults (empty strings, `"type": "task"`, `"priority": 2`, `"epic": null`, and an empty `epics/` directory) after backing up the store and stopping clients. Clients MUST NOT silently rewrite them.
+The manifest version governs record shape, validation, and coordination semantics. Unsupported versions MUST be rejected before creating a lock or scratch file. Unknown fields are invalid. Draft 1 adds description and acceptance criteria, and later type, priority, epic, labels, and the epics directory, to the earlier unreleased draft. Because no release had been announced, these stayed within version 1 instead of bumping it. Earlier hand-authored records missing these fields fail validation and require an explicit offline edit adding the defaults (empty strings, `"type": "task"`, `"priority": 2`, `"epic": null`, `"labels": []`, and an empty `epics/` directory) after backing up the store and stopping clients. Clients MUST NOT silently rewrite them.
 
 After v1 freezes, changing required or allowed fields or coordination rules requires a new protocol version. Conforming clients MUST agree on the semantic JSON results and exit codes. JSON whitespace, member order, and human-readable presentation may differ.
 
@@ -71,7 +72,7 @@ After v1 freezes, changing required or allowed fields or coordination rules requ
 | Plain directory | Initialization and the complete issue lifecycle work outside a Git repository with networking unavailable. |
 | Task content | Multiline Unicode descriptions and acceptance criteria survive create/show round trips. |
 | Dependency chain | B depends on A. B is blocked until A closes, then becomes ready. |
-| Priority and grouping | Ready work is ordered by priority before age. Type and epic filters select the matching issues. An issue moves between epics without a claim, and a missing epic invalidates the store. |
+| Priority and grouping | Ready work is ordered by priority before age. Type, epic, and label filters select the matching issues; repeated label filters require every label. An issue moves between epics without a claim, and a missing epic invalidates the store. |
 | Competing claims | Two independent processes claim one issue. Exactly one succeeds. The other returns busy or conflict according to when it acquires the lock. |
 | Stale assignment | Claim, release, and claim again. The original token cannot close or release the new assignment. |
 | Publication interruption | Before replacement, the old record remains. After replacement, a complete new record is visible after lock recovery. |

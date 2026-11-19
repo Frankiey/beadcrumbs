@@ -1,6 +1,6 @@
 # Implementation progress
 
-Updated 18 November 2026. Reference client 0.1.0 implements core contract v1 draft 1, including issue types, priority, and epics.
+Updated 19 November 2026. Reference client 0.1.0 implements core contract v1 draft 1, including issue types, priority, epics, and labels.
 
 Read this file and AGENTS.md when continuing in another chat. Keep completed work, evidence, and outstanding verification current here.
 
@@ -15,7 +15,7 @@ Read this file and AGENTS.md when continuing in another chat. Keep completed wor
 
 ## Verification
 
-Run `python3 -m unittest discover -s tests -v` from the repository root. The default Python discovery currently has 32 test methods, with 28 active and four pair tests skipped unless a peer is configured, including parameterized cases and eleven shared fixture scenarios. It passed on macOS with Python 3.15.2. Tests use temporary stores outside Git and require no external packages.
+Run `python3 -m unittest discover -s tests -v` from the repository root. The default Python discovery currently has 33 test methods, with 29 active and four pair tests skipped unless a peer is configured, including parameterized cases and seventeen shared fixture scenarios. It passed on macOS with Python 3.15.2. Tests use temporary stores outside Git and require no external packages.
 
 The black-box CLI suite supports BEADCRUMBS_COMMAND as a JSON argv array for all clients. Reference-only fault injection stays in test_storage.py. Documentation links and JSON artifacts are checked during this implementation handoff.
 
@@ -91,4 +91,15 @@ Added on 18 November 2026 and kept within store version 1, since nothing had bee
 - `--init` creates `epics/`. Stores made before this change need the offline conversion described in the core contract.
 - Schemas: new `schemas/v1/epic.schema.json`; issue and result schemas updated. Shared fixtures add a combined epics/types/priority scenario and four invalid-store cases. New CLI and interop tests cover create, filter, set-epic, edit-epic, show-epic, conflicts, and board grouping across clients.
 - All five clients implement the change. Locally on macOS: Python unittest (28 active, 4 skipped pair tests), each port's native tests, `make check`, and `make matrix` (21 CLI tests per client and 4 interop tests per pair, all 15 suites passing). The integration example now uses an epic, a type, and a priority; its temporary CI diagnostics were removed.
+- Not yet verified: this branch's Linux and Windows CI runs.
+
+## Labels
+
+Added on 19 November 2026, also within store version 1.
+
+- Issue records gain `labels`: an array of at most 32 distinct lowercase slugs (`^[a-z0-9][a-z0-9-]{0,63}$`), stored sorted ascending. Unsorted or duplicate arrays invalidate the store. There is no label registry.
+- `--create` accepts repeatable `--label`. `--relabel ID [--add L ...] [--remove L ...]` changes labels in any state without a claim token and bumps the revision. It needs at least one `--add` or `--remove`, rejects a label in both (exit 2), and returns exit 4 when nothing changes or the result would exceed 32 labels.
+- `--list` and `--ready` accept repeatable `--label`; an issue must have every given label. The board gains a Labels column between Title and Agent.
+- Schemas, shared fixtures (one labels scenario and five invalid-store cases), a new CLI test, the cross-client epic/type/priority interop test, and the integration example cover labels.
+- All five clients implement the change. Locally on macOS: Python unittest (29 active, 4 skipped pair tests), each port's native tests, `make check`, `make py-integration`, and `make matrix` (22 CLI tests per client and 4 interop tests per pair, all 15 suites passing).
 - Not yet verified: this branch's Linux and Windows CI runs.

@@ -14,6 +14,7 @@ import uuid
 from collections import deque
 from contextlib import contextmanager
 from datetime import datetime, timezone
+from itertools import pairwise
 from pathlib import Path
 
 VERSION = "0.1.0"
@@ -25,6 +26,8 @@ TIME = r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z"
 EPIC = r"[a-z0-9][a-z0-9-]{0,63}"
 # "none" clears an epic; the others are reserved device names on Windows.
 RESERVED_EPICS = {"none", "con", "prn", "aux", "nul"} | {f"{p}{n}" for p in ("com", "lpt") for n in range(10)}
+LABEL = r"[a-z0-9][a-z0-9-]{0,63}"
+MAX_LABELS = 32
 TYPES = ("task", "bug", "chore", "docs", "spike")
 PRIORITIES = range(5)
 DEFAULT_PRIORITY = 2
@@ -34,6 +37,7 @@ FIELDS = {
     "type",
     "priority",
     "epic",
+    "labels",
     "title",
     "description",
     "acceptance_criteria",
@@ -168,6 +172,10 @@ def validate_issue(issue):
     require(issue["type"] in TYPES, "Invalid issue type")
     require(type(issue["priority"]) is int and issue["priority"] in PRIORITIES, "Invalid priority")
     require(issue["epic"] is None or epic_key(issue["epic"]), "Invalid epic key")
+    labels = issue["labels"]
+    require(isinstance(labels, list) and all(matches(LABEL, label) for label in labels), "Invalid labels")
+    require(len(labels) <= MAX_LABELS, "Too many labels")
+    require(all(a < b for a, b in pairwise(labels)), "Labels must be distinct and sorted")
     for field in ("title", "description", "acceptance_criteria"):
         text_value(issue[field], nonempty=field == "title")
     require(issue["state"] in ("open", "claimed", "closed"), "Invalid issue state")
@@ -397,15 +405,16 @@ def render_board(ordered, issues, generated, epics=None):
             continue
         lines.extend(
             [
-                "| Status | ID | Type | Priority | Title | Agent | Blockers |",
-                "| --- | --- | --- | --- | --- | --- | --- |",
+                "| Status | ID | Type | Priority | Title | Labels | Agent | Blockers |",
+                "| --- | --- | --- | --- | --- | --- | --- | --- |",
             ]
         )
         for item in sorted(members, key=lambda issue: STATUSES.index(status(issue, issues))):
             unresolved = blockers(item, issues)
             owner = item["claim"]["agent"] if item["claim"] else "—"
             dependencies = ", ".join(dep["id"] + " (" + dep["state"] + ")" for dep in unresolved) or "—"
-            cells = (status(item, issues), item["id"], item["type"], f"P{item['priority']}", item["title"], owner)
+            tags = ", ".join(item["labels"]) or "—"
+            cells = (status(item, issues), item["id"], item["type"], f"P{item['priority']}", item["title"], tags, owner)
             lines.append("| " + " | ".join(markdown_cell(cell) for cell in (*cells, dependencies)) + " |")
         lines.append("")
     return "\n".join(lines)
@@ -436,6 +445,8 @@ def find_epic(key, epics):
 
 def in_scope(args, issue, epics):
     if getattr(args, "type", None) is not None and issue["type"] != args.type:
+        return False
+    if not set(getattr(args, "label", [])).issubset(issue["labels"]):
         return False
     if getattr(args, "epic", None) is None:
         return True
@@ -515,6 +526,7 @@ def run_action(args, root, issues, codec=ISSUE_CODEC, epics=None):
             type=args.type or "task",
             priority=DEFAULT_PRIORITY if args.priority is None else args.priority,
             epic=epic,
+            labels=sorted(args.label),
             title=args.create,
             description=args.description,
             acceptance_criteria=args.acceptance_criteria,
@@ -543,6 +555,12 @@ def run_action(args, root, issues, codec=ISSUE_CODEC, epics=None):
             target = None if args.epic == "none" else find_epic(args.epic, epics)["key"]
             if issue["epic"] == target:
                 raise Failure("Issue epic is unchanged", 4)
+        elif action == "relabel":
+            labels = sorted((set(issue["labels"]) | set(args.add)) - set(args.remove))
+            if labels == issue["labels"]:
+                raise Failure("Issue labels are unchanged", 4)
+            if len(labels) > MAX_LABELS:
+                raise Failure(f"An issue can have at most {MAX_LABELS} labels", 4)
         require(issue["revision"] < MAX_REVISION, "Revision exhausted")
         now = now_utc()
         if action == "claim":
@@ -551,6 +569,8 @@ def run_action(args, root, issues, codec=ISSUE_CODEC, epics=None):
             issue["notes"].append({"at": now, "by": args.agent, "text": args.text})
         elif action == "set-epic":
             issue["epic"] = target
+        elif action == "relabel":
+            issue["labels"] = labels
         else:
             issue.update(state="closed" if action == "close" else "open", claim=None)
         issue["revision"] += 1
@@ -578,6 +598,7 @@ ACTIONS = (
     "release",
     "close",
     "set-epic",
+    "relabel",
     "create-epic",
     "edit-epic",
     "show-epic",
@@ -586,18 +607,20 @@ ACTIONS = (
     "help",
     "version",
 )
-ISSUE_VALUED = ("show", "claim", "note", "release", "close", "set-epic")
+ISSUE_VALUED = ("show", "claim", "note", "release", "close", "set-epic", "relabel")
+REPEATABLE = ("--depends-on", "--label", "--add", "--remove")
 EPIC_VALUED = ("create-epic", "edit-epic", "show-epic")
 DESCRIPTION = {"--description", "--description-file"}
 OPTIONS = {
-    "create": {"--depends-on", "--acceptance-criteria", "--type", "--priority", "--epic", *DESCRIPTION},
-    "list": {"--state", "--type", "--epic"},
-    "ready": {"--type", "--epic"},
+    "create": {"--depends-on", "--acceptance-criteria", "--type", "--priority", "--epic", "--label", *DESCRIPTION},
+    "list": {"--state", "--type", "--epic", "--label"},
+    "ready": {"--type", "--epic", "--label"},
     "claim": {"--agent"},
     "note": {"--agent", "--text"},
     "release": {"--token"},
     "close": {"--token"},
     "set-epic": {"--epic"},
+    "relabel": {"--add", "--remove"},
     "create-epic": {"--title", *DESCRIPTION},
     "edit-epic": DESCRIPTION,
 }
@@ -626,13 +649,14 @@ def parse_args(argv):
         "title",
     ):
         parser.add_argument("--" + name)
-    parser.add_argument("--depends-on", action="append", default=[])
+    for name in REPEATABLE:
+        parser.add_argument(name, action="append", default=[])
     parser.add_argument("--json", action="store_true")
     seen = set()
     for word in argv:
         if word.startswith("--"):
             option = word.split("=", 1)[0]
-            if option in seen and option != "--depends-on":
+            if option in seen and option not in REPEATABLE:
                 parser.error(f"Repeated option: {option}")
             seen.add(option)
     args = parser.parse_args(argv)
@@ -660,6 +684,14 @@ def parse_args(argv):
         for dep in args.depends_on:
             require(matches(ID, dep), "Invalid dependency ID")
         require(len(set(args.depends_on)) == len(args.depends_on), "Duplicate dependency")
+        for name in ("label", "add", "remove"):
+            values = getattr(args, name)
+            require(all(matches(LABEL, value) for value in values), "Invalid label")
+            require(len(set(values)) == len(values), "Duplicate label")
+        require(len(args.label) <= MAX_LABELS, f"An issue can have at most {MAX_LABELS} labels")
+        if args.action == "relabel":
+            require(args.add or args.remove, "--add or --remove is required")
+            require(not set(args.add) & set(args.remove), "A label cannot be both added and removed")
         if args.action in ("claim", "note"):
             require(matches(AGENT, args.agent), "Valid --agent is required")
         if args.action in ("release", "close"):

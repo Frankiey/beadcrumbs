@@ -58,13 +58,32 @@ class InteroperabilityTests(unittest.TestCase):
         )
         self.assertEqual(self.call(PEER, "--validate")["issue_count"], 2)
 
-    def test_epics_types_and_priorities_across_clients(self):
+    def test_epics_types_priorities_and_labels_across_clients(self):
         self.call(PRIMARY, "--init")
         self.call(PEER, "--create-epic", "shared", "--title", "Shared epic", "--description", "λ")
         self.call(PRIMARY, "--create-epic", "shared", "--title", "Again", code=4)
         low = self.call(PRIMARY, "--create", "Low", "--priority", "4", "--type", "chore")
-        bug = self.call(PEER, "--create", "Bug", "--priority", "0", "--type", "bug", "--epic", "shared")
+        bug = self.call(
+            PEER,
+            "--create",
+            "Bug",
+            "--priority",
+            "0",
+            "--type",
+            "bug",
+            "--epic",
+            "shared",
+            "--label",
+            "ui",
+            "--label",
+            "api",
+        )
+        self.assertEqual(bug["labels"], ["api", "ui"])
         self.assertEqual(self.call(PRIMARY, "--ready"), [bug, low])
+        bug = self.call(PRIMARY, "--relabel", bug["id"], "--add", "backend", "--remove", "ui")
+        self.assertEqual(bug["labels"], ["api", "backend"])
+        self.call(PEER, "--relabel", bug["id"], "--add", "api", code=4)
+        self.assertEqual(self.call(PEER, "--list", "--label", "backend", "--label", "api"), [bug])
         moved = self.call(PRIMARY, "--set-epic", low["id"], "--epic", "shared")
         self.assertEqual(self.call(PEER, "--show", low["id"]), moved)
         edited = self.call(PRIMARY, "--edit-epic", "shared", "--description", "Updated")

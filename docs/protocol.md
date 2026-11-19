@@ -32,6 +32,7 @@ Path is `.beadcrumbs/store.json`.
   "type": "docs",
   "priority": 1,
   "epic": "offline-docs",
+  "labels": ["onboarding", "windows"],
   "title": "Document the offline setup",
   "description": "Document setup in a local directory with networking unavailable.",
   "acceptance_criteria": "A new worker can follow the instructions and run the lifecycle.",
@@ -62,6 +63,7 @@ classDiagram
         type: task | bug | chore | docs | spike
         priority: 0..4
         epic: key | null
+        labels: slug[]
         title: string
         description: string
         acceptance_criteria: string
@@ -101,7 +103,8 @@ classDiagram
 | `id` | Issue ID. Immutable. |
 | `type` | One of `task`, `bug`, `chore`, `docs`, or `spike`. Created as `task` unless supplied. Immutable. Used only for categorizing and filtering. |
 | `priority` | JSON integer from 0 (most urgent) through 4. Created as 2 unless supplied. Immutable. |
-| `epic` | Key of an existing epic, or JSON `null`. Created as `null` unless supplied. The only issue field that can be reassigned after creation, in any state. |
+| `epic` | Key of an existing epic, or JSON `null`. Created as `null` unless supplied. Can be reassigned after creation, in any state. |
+| `labels` | Array of at most 32 free-form tags. Each matches `^[a-z0-9][a-z0-9-]{0,63}$`. Stored sorted ascending as ASCII with no duplicates. Created as `[]` unless supplied. Can be changed after creation, in any state. Labels have no registry, so any valid tag is accepted. |
 | `title` | Nonempty string. Immutable in v1. |
 | `description` | String, empty allowed. Immutable in v1. |
 | `acceptance_criteria` | String, empty allowed. Immutable in v1. |
@@ -115,7 +118,7 @@ classDiagram
 
 Nonempty strings contain at least one Unicode scalar value. Clients preserve content, including whitespace. Integer fields use decimal digits without a fraction or exponent. Booleans are invalid.
 
-Claim changes `state` to `claimed` and sets `claim`. Release changes `state` to `open` and clears `claim`. Close changes `state` to `closed` and clears `claim`. A note appends one object using the mutation timestamp for `at`. Set-epic replaces `epic` with a different value. Every mutation updates `updated_at` and increments `revision`. Preserve all other fields.
+Claim changes `state` to `claimed` and sets `claim`. Release changes `state` to `open` and clears `claim`. Close changes `state` to `closed` and clears `claim`. A note appends one object using the mutation timestamp for `at`. Set-epic replaces `epic` with a different value. Relabel replaces `labels` with a different sorted set. Every mutation updates `updated_at` and increments `revision`. Preserve all other fields.
 
 ## Epic record
 
@@ -147,7 +150,7 @@ Epics cannot be deleted through the CLI. An issue whose `epic` names a missing e
 
 Under the lock, draft v1 clients load and validate all epic and issue candidates, dependency references, and epic references before any command. A missing dependency, missing epic, cycle, malformed record, or unexpected file type at a protocol path invalidates the store. A claimed or closed issue must have all its dependencies closed. A missing issue requested by ID is a separate error. Creation only accepts dependencies on existing issues, which makes a cycle impossible through the CLI.
 
-A ready issue is `open` with all direct dependencies `closed`. Sort issue lists by `priority` ascending, then `created_at` ascending, then issue ID ascending. Compare the strings as ASCII. Sort epic lists by key. Type, priority, and epic never affect readiness or claiming.
+A ready issue is `open` with all direct dependencies `closed`. Sort issue lists by `priority` ascending, then `created_at` ascending, then issue ID ascending. Compare the strings as ASCII. Sort epic lists by key. Type, priority, epic, and labels never affect readiness or claiming.
 
 Changes to required fields, allowed fields, validation, or locking semantics require a protocol version increment after v1 freezes. A client's release version is independent of the store version. An older client encountering a newer format must leave it untouched.
 

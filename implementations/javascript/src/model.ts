@@ -17,6 +17,8 @@ export const epicPattern = /[a-z0-9][a-z0-9-]{0,63}/;
 // "none" clears an epic; the others are reserved device names on Windows.
 const reservedEpics = new Set(["none", "con", "prn", "aux", "nul",
   ...[..."0123456789"].flatMap(n => ["com" + n, "lpt" + n])]);
+export const labelPattern = /[a-z0-9][a-z0-9-]{0,63}/;
+export const maxLabels = 32;
 export const issueTypes = ["task", "bug", "chore", "docs", "spike"] as const;
 export const defaultPriority = 2;
 export const statuses = ["ready", "blocked", "claimed", "closed"] as const;
@@ -59,6 +61,7 @@ export interface Issue {
   type: string;
   priority: number;
   epic: string | null;
+  labels: string[];
   title: string;
   description: string;
   acceptance_criteria: string;
@@ -72,7 +75,7 @@ export interface Issue {
 }
 
 export function validateIssue(value: unknown): asserts value is Issue {
-  objectFields(value, ["id", "type", "priority", "epic", "title", "description", "acceptance_criteria", "state",
+  objectFields(value, ["id", "type", "priority", "epic", "labels", "title", "description", "acceptance_criteria", "state",
     "depends_on", "claim", "notes", "created_at", "updated_at", "revision"]);
   requireValue(matches(idPattern, value.id), "Invalid issue ID");
   requireValue(typeof value.type === "string" && (issueTypes as readonly string[]).includes(value.type),
@@ -80,6 +83,12 @@ export function validateIssue(value: unknown): asserts value is Issue {
   requireValue(typeof value.priority === "number" && Number.isInteger(value.priority) &&
     value.priority >= 0 && value.priority <= 4, "Invalid priority");
   requireValue(value.epic === null || epicKey(value.epic), "Invalid epic key");
+  requireValue(Array.isArray(value.labels) && value.labels.every(label => matches(labelPattern, label)),
+    "Invalid labels");
+  const labels = value.labels as string[];
+  requireValue(labels.length <= maxLabels, "Too many labels");
+  requireValue(labels.every((label, index) => index === 0 || labels[index - 1]! < label),
+    "Labels must be distinct and sorted");
   textValue(value.title, true);
   textValue(value.description);
   textValue(value.acceptance_criteria);

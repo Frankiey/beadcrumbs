@@ -14,8 +14,9 @@ import (
 	"unicode/utf8"
 )
 
-var actionNames = []string{"init", "create", "show", "list", "ready", "blocked", "validate", "claim", "note", "release", "close", "set-epic", "create-epic", "edit-epic", "show-epic", "epics", "board", "help", "version"}
-var issueActions = []string{"show", "claim", "note", "release", "close", "set-epic"}
+var actionNames = []string{"init", "create", "show", "list", "ready", "blocked", "validate", "claim", "note", "release", "close", "set-epic", "relabel", "create-epic", "edit-epic", "show-epic", "epics", "board", "help", "version"}
+var issueActions = []string{"show", "claim", "note", "release", "close", "set-epic", "relabel"}
+var repeatable = []string{"depends-on", "label", "add", "remove"}
 var epicActions = []string{"create-epic", "edit-epic", "show-epic"}
 
 func contains(items []string, value string) bool {
@@ -31,12 +32,13 @@ type Arguments struct {
 	Action, Value string
 	Options       map[string]string
 	Dependencies  []string
+	Repeated      map[string][]string
 	JSON          bool
 }
 
 func parse(argv []string) (Arguments, error) {
-	args := Arguments{Options: map[string]string{}, Dependencies: []string{}}
-	values := append([]string{"create", "workspace", "state", "agent", "token", "text", "description", "description-file", "acceptance-criteria", "depends-on", "type", "priority", "epic", "title"}, append(issueActions, epicActions...)...)
+	args := Arguments{Options: map[string]string{}, Dependencies: []string{}, Repeated: map[string][]string{}}
+	values := append([]string{"create", "workspace", "state", "agent", "token", "text", "description", "description-file", "acceptance-criteria", "depends-on", "type", "priority", "epic", "title", "label", "add", "remove"}, append(issueActions, epicActions...)...)
 	for i := 0; i < len(argv); i++ {
 		word := argv[i]
 		if !strings.HasPrefix(word, "--") {
@@ -48,7 +50,7 @@ func parse(argv []string) (Arguments, error) {
 		if !contains(actionNames, name) && !contains(values, name) && name != "json" {
 			return args, failure(2, "unknown option")
 		}
-		if _, exists := args.Options[name]; exists && name != "depends-on" {
+		if _, exists := args.Options[name]; exists && !contains(repeatable, name) {
 			return args, failure(2, "repeated option")
 		}
 		if contains(values, name) {
@@ -74,15 +76,17 @@ func parse(argv []string) (Arguments, error) {
 		args.Options[name] = value
 		if name == "depends-on" {
 			args.Dependencies = append(args.Dependencies, value)
+		} else if contains(repeatable, name) {
+			args.Repeated[name] = append(args.Repeated[name], value)
 		}
 	}
 	if args.Action == "" {
 		return args, failure(2, "action required")
 	}
 	allowed := map[string][]string{
-		"create": {"depends-on", "description", "description-file", "acceptance-criteria", "type", "priority", "epic"},
-		"list":   {"state", "type", "epic"}, "ready": {"type", "epic"}, "claim": {"agent"}, "note": {"agent", "text"},
-		"release": {"token"}, "close": {"token"}, "set-epic": {"epic"},
+		"create": {"depends-on", "description", "description-file", "acceptance-criteria", "type", "priority", "epic", "label"},
+		"list":   {"state", "type", "epic", "label"}, "ready": {"type", "epic", "label"}, "claim": {"agent"}, "note": {"agent", "text"},
+		"release": {"token"}, "close": {"token"}, "set-epic": {"epic"}, "relabel": {"add", "remove"},
 		"create-epic": {"title", "description", "description-file"}, "edit-epic": {"description", "description-file"},
 	}
 	for key := range args.Options {
@@ -135,6 +139,28 @@ func parse(argv []string) (Arguments, error) {
 	}
 	if state, ok := args.Options["state"]; ok && !contains([]string{"open", "claimed", "closed"}, state) {
 		return args, failure(2, "invalid state")
+	}
+	for _, name := range []string{"label", "add", "remove"} {
+		unique := map[string]bool{}
+		for _, label := range args.Repeated[name] {
+			if !labelRE.MatchString(label) || unique[label] {
+				return args, failure(2, "invalid or duplicate label")
+			}
+			unique[label] = true
+		}
+	}
+	if len(args.Repeated["label"]) > maxLabels {
+		return args, failure(2, "too many labels")
+	}
+	if args.Action == "relabel" {
+		if len(args.Repeated["add"]) == 0 && len(args.Repeated["remove"]) == 0 {
+			return args, failure(2, "--add or --remove is required")
+		}
+		for _, label := range args.Repeated["add"] {
+			if contains(args.Repeated["remove"], label) {
+				return args, failure(2, "a label cannot be both added and removed")
+			}
+		}
 	}
 	seen := map[string]bool{}
 	for _, dep := range args.Dependencies {
@@ -234,7 +260,7 @@ func renderBoard(issues map[string]*Issue, epics map[string]*Epic, generated str
 			lines = append(lines, "No issues.", "")
 			continue
 		}
-		lines = append(lines, "| Status | ID | Type | Priority | Title | Agent | Blockers |", "| --- | --- | --- | --- | --- | --- | --- |")
+		lines = append(lines, "| Status | ID | Type | Priority | Title | Labels | Agent | Blockers |", "| --- | --- | --- | --- | --- | --- | --- | --- |")
 		for _, state := range statuses {
 			for _, issue := range groups[key] {
 				if status(issue, issues) != state {
@@ -252,7 +278,11 @@ func renderBoard(issues map[string]*Issue, epics map[string]*Epic, generated str
 				if len(deps) > 0 {
 					text = strings.Join(deps, ", ")
 				}
-				cells := []string{state, issue.ID, issue.Type, "P" + strconv.FormatInt(issue.Priority, 10), issue.Title, owner, text}
+				tags := "—"
+				if len(issue.Labels) > 0 {
+					tags = strings.Join(issue.Labels, ", ")
+				}
+				cells := []string{state, issue.ID, issue.Type, "P" + strconv.FormatInt(issue.Priority, 10), issue.Title, tags, owner, text}
 				for i := range cells {
 					cells[i] = cell(cells[i])
 				}
@@ -272,6 +302,11 @@ func findEpic(key string, epics map[string]*Epic) (*Epic, error) {
 func inScope(args Arguments, issue *Issue, epics map[string]*Epic) (bool, error) {
 	if kind, ok := args.Options["type"]; ok && issue.Type != kind {
 		return false, nil
+	}
+	for _, label := range args.Repeated["label"] {
+		if !contains(issue.Labels, label) {
+			return false, nil
+		}
 	}
 	epic, ok := args.Options["epic"]
 	if !ok {
@@ -420,7 +455,9 @@ func run(args Arguments, root string, issues map[string]*Issue, epics map[string
 			id = "bc-" + id
 		}
 		created := now()
-		issue = &Issue{ID: id, Type: kind, Priority: priority, Epic: epic, Title: args.Value, Description: args.Options["description"], Acceptance: args.Options["acceptance-criteria"], State: "open", Dependencies: args.Dependencies, Notes: []Note{}, Created: created, Updated: created, Revision: 1}
+		labels := append([]string{}, args.Repeated["label"]...)
+		sort.Strings(labels)
+		issue = &Issue{ID: id, Type: kind, Priority: priority, Epic: epic, Labels: labels, Title: args.Value, Description: args.Options["description"], Acceptance: args.Options["acceptance-criteria"], State: "open", Dependencies: args.Dependencies, Notes: []Note{}, Created: created, Updated: created, Revision: 1}
 	} else {
 		issue = issues[args.Value]
 		if issue == nil {
@@ -430,6 +467,7 @@ func run(args Arguments, root string, issues map[string]*Issue, epics map[string
 			return issue, nil
 		}
 		var target *string
+		var labels []string
 		if args.Action == "claim" {
 			if status(issue, issues) != "ready" {
 				return nil, failure(4, "issue is not ready")
@@ -448,6 +486,20 @@ func run(args Arguments, root string, issues map[string]*Issue, epics map[string
 			}
 			if (issue.Epic == nil) == (target == nil) && (target == nil || *issue.Epic == *target) {
 				return nil, failure(4, "issue epic is unchanged")
+			}
+		} else if args.Action == "relabel" {
+			labels = []string{}
+			for _, label := range append(append([]string{}, issue.Labels...), args.Repeated["add"]...) {
+				if !contains(labels, label) && !contains(args.Repeated["remove"], label) {
+					labels = append(labels, label)
+				}
+			}
+			sort.Strings(labels)
+			if strings.Join(labels, ",") == strings.Join(issue.Labels, ",") {
+				return nil, failure(4, "issue labels are unchanged")
+			}
+			if len(labels) > maxLabels {
+				return nil, failure(4, "too many labels")
 			}
 		}
 		if issue.Revision >= maxRevision {
@@ -472,6 +524,8 @@ func run(args Arguments, root string, issues map[string]*Issue, epics map[string
 			issue.Claim = nil
 		case "set-epic":
 			issue.Epic = target
+		case "relabel":
+			issue.Labels = labels
 		}
 		issue.Updated = updated
 		issue.Revision++

@@ -70,9 +70,13 @@ def run_scenario(workspace, transcript, setup_only):
         "1",
         "--epic",
         epic["key"],
+        "--label",
+        "onboarding",
     )
     second = call("--create", "Verify the setup guide", "--depends-on", first["id"], "--epic", epic["key"])
     check((first["type"], first["priority"], first["epic"]) == ("docs", 1, epic["key"]), "Unexpected fields")
+    check(first["labels"] == ["onboarding"], "Unexpected labels", actual=first["labels"])
+    check(call("--list", "--label", "onboarding") == [first], "Unexpected label filter")
     check(first["description"] == brief_text, "Brief changed", expected=brief_text, actual=first["description"])
     check(call("--ready") == [first], "Unexpected initial ready list")
     check(

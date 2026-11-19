@@ -10,17 +10,23 @@ public sealed class Arguments
     public string Value { get; private set; } = "";
     public Dictionary<string, string> Options { get; } = new(StringComparer.Ordinal);
     public List<string> Dependencies { get; } = [];
+    public Dictionary<string, List<string>> Repeated { get; } = new(StringComparer.Ordinal)
+    {
+        ["label"] = [],
+        ["add"] = [],
+        ["remove"] = []
+    };
     public string Get(string key) => Options.GetValueOrDefault(key, "");
     public static readonly string[] Actions = ["init", "create", "show", "list", "ready", "blocked", "validate",
-        "claim", "note", "release", "close", "set-epic", "create-epic", "edit-epic", "show-epic", "epics", "board",
+        "claim", "note", "release", "close", "set-epic", "relabel", "create-epic", "edit-epic", "show-epic", "epics", "board",
         "help", "version"];
-    private static readonly string[] IssueActions = ["show", "claim", "note", "release", "close", "set-epic"];
+    private static readonly string[] IssueActions = ["show", "claim", "note", "release", "close", "set-epic", "relabel"];
     private static readonly string[] EpicActions = ["create-epic", "edit-epic", "show-epic"];
     public static Arguments Parse(string[] argv)
     {
         var result = new Arguments();
         string[] values = ["create", .. IssueActions, .. EpicActions, "workspace", "state", "agent", "token", "text",
-            "description", "description-file", "acceptance-criteria", "depends-on", "type", "priority", "epic", "title"];
+            "description", "description-file", "acceptance-criteria", "depends-on", "type", "priority", "epic", "title", "label", "add", "remove"];
         try
         {
             for (int index = 0; index < argv.Length; index++)
@@ -30,7 +36,8 @@ public sealed class Arguments
                 string[] pair = word[2..].Split('=', 2);
                 string name = pair[0], value = "";
                 Model.Require(Actions.Contains(name) || values.Contains(name) || name == "json", "Unknown option");
-                Model.Require(name == "depends-on" || !result.Options.ContainsKey(name), "Repeated option");
+                Model.Require(name == "depends-on" || result.Repeated.ContainsKey(name) || !result.Options.ContainsKey(name),
+                    "Repeated option");
                 if (values.Contains(name))
                 {
                     if (pair.Length == 2) value = pair[1];
@@ -49,14 +56,16 @@ public sealed class Arguments
                 }
                 result.Options[name] = value;
                 if (name == "depends-on") result.Dependencies.Add(value);
+                if (result.Repeated.TryGetValue(name, out var list)) list.Add(value);
             }
             Model.Require(result.Action != "", "Action required");
             string[] specific = result.Action switch
             {
-                "create" => ["depends-on", "description", "description-file", "acceptance-criteria", "type", "priority", "epic"],
-                "list" => ["state", "type", "epic"],
-                "ready" => ["type", "epic"],
+                "create" => ["depends-on", "description", "description-file", "acceptance-criteria", "type", "priority", "epic", "label"],
+                "list" => ["state", "type", "epic", "label"],
+                "ready" => ["type", "epic", "label"],
                 "set-epic" => ["epic"],
+                "relabel" => ["add", "remove"],
                 "create-epic" => ["title", "description", "description-file"],
                 "edit-epic" => ["description", "description-file"],
                 "claim" => ["agent"],
@@ -90,6 +99,16 @@ public sealed class Arguments
             if (result.Options.ContainsKey("state")) Model.Require(result.Get("state") is "open" or "claimed" or "closed", "Invalid state");
             Model.Require(result.Dependencies.All(id => Model.Matches(Model.IdPattern, id)) &&
                 result.Dependencies.Distinct().Count() == result.Dependencies.Count, "Invalid dependency");
+            foreach (var labels in result.Repeated.Values)
+                Model.Require(labels.All(label => Model.Matches(Model.LabelPattern, label)) &&
+                    labels.Distinct().Count() == labels.Count, "Invalid label");
+            Model.Require(result.Repeated["label"].Count <= Model.MaxLabels, "Too many labels");
+            if (result.Action == "relabel")
+            {
+                Model.Require(result.Repeated["add"].Count + result.Repeated["remove"].Count > 0, "--add or --remove is required");
+                Model.Require(!result.Repeated["add"].Intersect(result.Repeated["remove"]).Any(),
+                    "A label cannot be both added and removed");
+            }
             Model.Require(!(result.Options.ContainsKey("description") && result.Options.ContainsKey("description-file")), "Conflicting description inputs");
             foreach (string text in result.Options.Values) Model.Scalar(text);
         }
@@ -149,8 +168,8 @@ public static class Board
             lines.Add("## " + Name(key)); lines.Add("");
             var group = Members(key);
             if (group.Count == 0) { lines.Add("No issues."); lines.Add(""); continue; }
-            lines.Add("| Status | ID | Type | Priority | Title | Agent | Blockers |");
-            lines.Add("| --- | --- | --- | --- | --- | --- | --- |");
+            lines.Add("| Status | ID | Type | Priority | Title | Labels | Agent | Blockers |");
+            lines.Add("| --- | --- | --- | --- | --- | --- | --- | --- |");
             foreach (var state in Model.Statuses)
                 foreach (var issue in group.Where(issue => Model.Status(issue, issues) == state))
                 {
@@ -159,7 +178,8 @@ public static class Board
                     string dependencies = blockers.Count == 0 ? "—" : string.Join(", ", blockers.Select(item =>
                         Model.Field((JsonObject)item!, "id") + " (" + Model.Field((JsonObject)item!, "state") + ")"));
                     string[] cells = [state, Model.Field(issue, "id"), Model.Field(issue, "type"),
-                        "P" + Model.Priority(issue).ToString(CultureInfo.InvariantCulture), Model.Field(issue, "title"), owner, dependencies];
+                        "P" + Model.Priority(issue).ToString(CultureInfo.InvariantCulture), Model.Field(issue, "title"),
+                        Model.Labels(issue) is { Length: > 0 } tags ? string.Join(", ", tags) : "—", owner, dependencies];
                     lines.Add("| " + string.Join(" | ", cells.Select(Cell)) + " |");
                 }
             lines.Add("");
@@ -175,6 +195,7 @@ public static class Commands
     private static bool InScope(Arguments args, JsonObject issue, IReadOnlyDictionary<string, JsonObject> epics)
     {
         if (args.Options.TryGetValue("type", out var type) && Model.Field(issue, "type") != type) return false;
+        if (!args.Repeated["label"].All(Model.Labels(issue).Contains)) return false;
         if (!args.Options.TryGetValue("epic", out var epic)) return true;
         if (epic == "none") return Model.Epic(issue) is null;
         FindEpic(epic, epics);
@@ -273,6 +294,8 @@ public static class Commands
                 ["priority"] = args.Options.TryGetValue("priority", out var priority)
                     ? long.Parse(priority, CultureInfo.InvariantCulture) : Model.DefaultPriority,
                 ["epic"] = epic,
+                ["labels"] = new JsonArray(args.Repeated["label"].Order(StringComparer.Ordinal)
+                    .Select(label => (JsonNode?)JsonValue.Create(label)).ToArray()),
                 ["title"] = args.Value,
                 ["description"] = args.Get("description"),
                 ["acceptance_criteria"] = args.Get("acceptance-criteria"),
@@ -292,6 +315,7 @@ public static class Commands
             issue = (JsonObject)original.DeepClone();
             string state = Model.Field(issue, "state");
             string? target = null;
+            string[] labels = [];
             if (args.Action == "claim")
             {
                 if (Model.Status(issue, issues) != "ready") throw new Failure("Issue is not ready", 4);
@@ -300,6 +324,14 @@ public static class Commands
             {
                 if (args.Get("epic") != "none") target = Model.Field(FindEpic(args.Get("epic"), epics), "key");
                 if (Model.Epic(issue) == target) throw new Failure("Issue epic is unchanged", 4);
+            }
+            else if (args.Action == "relabel")
+            {
+                var current = Model.Labels(issue);
+                labels = current.Union(args.Repeated["add"]).Except(args.Repeated["remove"])
+                    .Order(StringComparer.Ordinal).ToArray();
+                if (labels.SequenceEqual(current)) throw new Failure("Issue labels are unchanged", 4);
+                if (labels.Length > Model.MaxLabels) throw new Failure("Too many labels", 4);
             }
             else if (args.Action is "close" or "release")
             {
@@ -318,6 +350,8 @@ public static class Commands
                 case "release": issue["state"] = "open"; issue["claim"] = null; break;
                 case "close": issue["state"] = "closed"; issue["claim"] = null; break;
                 case "set-epic": issue["epic"] = target; break;
+                case "relabel":
+                    issue["labels"] = new JsonArray(labels.Select(label => (JsonNode?)JsonValue.Create(label)).ToArray()); break;
                 default: throw new Failure("Unsupported action", 2);
             }
             issue["revision"] = revision + 1; issue["updated_at"] = updated;

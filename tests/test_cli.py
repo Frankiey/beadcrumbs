@@ -63,6 +63,15 @@ class CliTests(unittest.TestCase):
             ["--set-epic", MISSING, "--epic", "../escape"],
             ["--blocked", "--epic", "auth"],
             ["--show-epic", "-bad"],
+            ["--create", "Task", "--label", "Backend"],
+            ["--create", "Task", "--label", "api", "--label", "api"],
+            ["--create", "Task", *[arg for n in range(33) for arg in ("--label", f"l{n}")]],
+            ["--relabel", MISSING],
+            ["--relabel", MISSING, "--add", "api", "--remove", "api"],
+            ["--relabel", MISSING, "--add", "bad_label"],
+            ["--relabel", MISSING, "--label", "api"],
+            ["--show", MISSING, "--add", "api"],
+            ["--blocked", "--label", "api"],
         ]:
             with self.subTest(args=args):
                 self.call(*args, code=2)
@@ -152,6 +161,30 @@ class CliTests(unittest.TestCase):
         path = self.workspace / ".beadcrumbs/epics/auth.json"
         path.unlink()
         self.call("--validate", code=1)
+
+    def test_labels(self):
+        self.init()
+        plain = self.value("--create", "Plain")
+        self.assertEqual(plain["labels"], [])
+        tagged = self.value("--create", "Tagged", "--label", "security", "--label", "backend", "--priority", "1")
+        self.assertEqual(tagged["labels"], ["backend", "security"])
+        self.assertEqual(self.value("--ready", "--label", "backend"), [tagged])
+        self.assertEqual(self.value("--list", "--label", "backend", "--label", "api"), [])
+        self.call("--relabel", plain["id"], "--remove", "backend", code=4)
+        self.call("--relabel", tagged["id"], "--add", "backend", code=4)
+        self.call("--relabel", "bc-00000000000040008000000000000009", "--add", "api", code=3)
+        token = self.value("--claim", tagged["id"], "--agent", "worker")["claim"]["token"]
+        relabeled = self.value("--relabel", tagged["id"], "--add", "api", "--remove", "security")
+        self.assertEqual(
+            (relabeled["labels"], relabeled["state"], relabeled["revision"]), (["api", "backend"], "claimed", 3)
+        )
+        self.assertEqual(relabeled["claim"]["token"], token)
+        many = [arg for n in range(32) for arg in ("--add", f"l{n:02d}")]
+        full = self.value("--relabel", plain["id"], *many)
+        self.assertEqual(len(full["labels"]), 32)
+        self.call("--relabel", plain["id"], "--add", "extra", code=4)
+        self.assertEqual(self.value("--relabel", plain["id"], "--remove", "l00", "--add", "extra")["revision"], 3)
+        self.assertEqual(self.value("--list", "--label", "api", "--state", "claimed"), [relabeled])
 
     def test_release_stale_token_and_repeated_claim(self):
         self.init()
@@ -340,7 +373,7 @@ class CliTests(unittest.TestCase):
         self.init()
         self.value("--create-epic", "empty", "--title", "Empty <b>epic</b>")
         self.value("--create-epic", "work", "--title", "Work")
-        first = self.value("--create", "Ready", "--epic", "work", "--type", "bug", "--priority", "1")
+        first = self.value("--create", "Ready", "--epic", "work", "--type", "bug", "--priority", "1", "--label", "api")
         dependent = self.value("--create", "Blocked", "--depends-on", first["id"])
         active = self.value("--create", "Unsafe | [link](https://example.test) <script>\nnext\u202e")
         claim = self.value("--claim", active["id"], "--agent", "worker")
@@ -355,7 +388,7 @@ class CliTests(unittest.TestCase):
         self.assertIn("| No epic | 0 | 1 | 1 | 1 |", content)
         self.assertIn("| Work (work) | 1 | 0 | 0 | 0 |", content)
         self.assertIn("## Empty &#60;b&#62;epic&#60;/b&#62; (empty)\n\nNo issues.", content)
-        self.assertIn(f"| ready | {first['id']} | bug | P1 | Ready | — | — |", content)
+        self.assertIn(f"| ready | {first['id']} | bug | P1 | Ready | api | — | — |", content)
         self.assertLess(content.index("## Empty"), content.index("## Work"))
         self.assertLess(content.index("## Work"), content.index("## No epic"))
         self.assertIn("&#124;", content)

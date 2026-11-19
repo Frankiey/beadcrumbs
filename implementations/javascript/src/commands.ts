@@ -1,7 +1,7 @@
 import * as path from "node:path";
 import { randomUUID } from "node:crypto";
-import { blockers, compareText, defaultPriority, Failure, manifest, maxRevision, orderedIssues, requireValue, status,
-  statuses } from "./model.js";
+import { blockers, compareText, defaultPriority, Failure, manifest, maxLabels, maxRevision, orderedIssues, requireValue,
+  status, statuses } from "./model.js";
 import type { Epic, Issue } from "./model.js";
 import { JsonIssueCodec } from "./codec.js";
 import type { IssueCodec } from "./codec.js";
@@ -20,6 +20,7 @@ function findEpic(key: string, epics: Map<string, Epic>): Epic {
 
 function inScope(args: Arguments, issue: Issue, epics: Map<string, Epic>): boolean {
   if (args.type !== undefined && issue.type !== args.type) return false;
+  if (!args.labels.every(label => issue.labels.includes(label))) return false;
   if (args.epic === undefined) return true;
   if (args.epic === "none") return issue.epic === null;
   findEpic(args.epic, epics);
@@ -83,6 +84,7 @@ export function runAction(args: Arguments, root: string, issues: Map<string, Iss
     const created = now();
     issue = {
       id, type: args.type ?? "task", priority: args.priority ?? defaultPriority, epic,
+      labels: [...args.labels].sort(compareText),
       title: args.value, description: args.description, acceptance_criteria: args.acceptance,
       state: "open", depends_on: args.dependencies, claim: null, notes: [],
       created_at: created, updated_at: created, revision: 1,
@@ -93,6 +95,7 @@ export function runAction(args: Arguments, root: string, issues: Map<string, Iss
     if (args.action === "show") return current;
     issue = structuredClone(current);
     let target: string | null = null;
+    let labels: string[] = [];
     if (args.action === "claim") {
       if (status(issue, issues) !== "ready") throw new Failure("Issue is not ready", 4);
     } else if (args.action === "close" || args.action === "release") {
@@ -100,6 +103,11 @@ export function runAction(args: Arguments, root: string, issues: Map<string, Iss
     } else if (args.action === "set-epic") {
       target = args.epic === "none" ? null : findEpic(args.epic!, epics).key;
       if (issue.epic === target) throw new Failure("Issue epic is unchanged", 4);
+    } else if (args.action === "relabel") {
+      labels = [...new Set([...issue.labels, ...args.add])].filter(label => !args.remove.includes(label))
+        .sort(compareText);
+      if (labels.join(",") === issue.labels.join(",")) throw new Failure("Issue labels are unchanged", 4);
+      if (labels.length > maxLabels) throw new Failure("An issue can have at most " + maxLabels + " labels", 4);
     }
     requireValue(issue.revision < maxRevision, "Revision exhausted");
     const updated = now();
@@ -109,6 +117,7 @@ export function runAction(args: Arguments, root: string, issues: Map<string, Iss
       case "close": issue.state = "closed"; issue.claim = null; break;
       case "release": issue.state = "open"; issue.claim = null; break;
       case "set-epic": issue.epic = target; break;
+      case "relabel": issue.labels = labels; break;
       default: throw new Failure("Unsupported action", 2);
     }
     issue.revision++;

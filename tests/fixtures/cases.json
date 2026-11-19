@@ -31,6 +31,7 @@
         "type": "task",
         "priority": 2,
         "epic": null,
+        "labels": [],
         "title": "Dependent",
         "description": "",
         "acceptance_criteria": "",
@@ -49,6 +50,7 @@
         "type": "task",
         "priority": 2,
         "epic": null,
+        "labels": [],
         "title": "Prerequisite",
         "description": "",
         "acceptance_criteria": "",
@@ -73,6 +75,7 @@
             "type": "task",
             "priority": 2,
             "epic": null,
+            "labels": [],
             "title": "Prerequisite",
             "description": "",
             "acceptance_criteria": "",
@@ -98,6 +101,7 @@
               "type": "task",
               "priority": 2,
               "epic": null,
+              "labels": [],
               "title": "Dependent",
               "description": "",
               "acceptance_criteria": "",
@@ -130,6 +134,7 @@
         "type": "task",
         "priority": 2,
         "epic": null,
+        "labels": [],
         "title": "Dependent",
         "description": "",
         "acceptance_criteria": "",
@@ -161,6 +166,7 @@
         "type": "task",
         "priority": 2,
         "epic": null,
+        "labels": [],
         "title": "Prerequisite",
         "description": "",
         "acceptance_criteria": "",
@@ -179,6 +185,7 @@
         "type": "task",
         "priority": 2,
         "epic": null,
+        "labels": [],
         "title": "Dependent",
         "description": "",
         "acceptance_criteria": "",
@@ -210,6 +217,7 @@
         "type": "task",
         "priority": 2,
         "epic": null,
+        "labels": [],
         "title": "Prerequisite",
         "description": "",
         "acceptance_criteria": "",
@@ -267,6 +275,7 @@
         "type": "task",
         "priority": 4,
         "epic": null,
+        "labels": [],
         "title": "Low priority, oldest",
         "description": "",
         "acceptance_criteria": "",
@@ -283,6 +292,7 @@
         "type": "bug",
         "priority": 0,
         "epic": "auth-rework",
+        "labels": [],
         "title": "Urgent bug",
         "description": "",
         "acceptance_criteria": "",
@@ -299,6 +309,7 @@
         "type": "chore",
         "priority": 2,
         "epic": "auth-rework",
+        "labels": [],
         "title": "Chore",
         "description": "",
         "acceptance_criteria": "",
@@ -315,6 +326,7 @@
         "type": "task",
         "priority": 1,
         "epic": "auth-rework",
+        "labels": [],
         "title": "Waits on bug",
         "description": "",
         "acceptance_criteria": "",
@@ -341,6 +353,7 @@
             "type": "bug",
             "priority": 0,
             "epic": "auth-rework",
+            "labels": [],
             "title": "Urgent bug",
             "description": "",
             "acceptance_criteria": "",
@@ -357,6 +370,7 @@
             "type": "task",
             "priority": 4,
             "epic": null,
+            "labels": [],
             "title": "Low priority, oldest",
             "description": "",
             "acceptance_criteria": "",
@@ -381,6 +395,7 @@
             "type": "bug",
             "priority": 0,
             "epic": "auth-rework",
+            "labels": [],
             "title": "Urgent bug",
             "description": "",
             "acceptance_criteria": "",
@@ -397,6 +412,7 @@
             "type": "task",
             "priority": 1,
             "epic": "auth-rework",
+            "labels": [],
             "title": "Waits on bug",
             "description": "",
             "acceptance_criteria": "",
@@ -415,6 +431,7 @@
             "type": "chore",
             "priority": 2,
             "epic": "auth-rework",
+            "labels": [],
             "title": "Chore",
             "description": "",
             "acceptance_criteria": "",
@@ -431,6 +448,7 @@
             "type": "task",
             "priority": 4,
             "epic": null,
+            "labels": [],
             "title": "Low priority, oldest",
             "description": "",
             "acceptance_criteria": "",
@@ -457,6 +475,7 @@
             "type": "bug",
             "priority": 0,
             "epic": "auth-rework",
+            "labels": [],
             "title": "Urgent bug",
             "description": "",
             "acceptance_criteria": "",
@@ -483,6 +502,7 @@
             "type": "task",
             "priority": 4,
             "epic": null,
+            "labels": [],
             "title": "Low priority, oldest",
             "description": "",
             "acceptance_criteria": "",
@@ -511,6 +531,7 @@
             "type": "chore",
             "priority": 2,
             "epic": "auth-rework",
+            "labels": [],
             "title": "Chore",
             "description": "",
             "acceptance_criteria": "",
@@ -567,6 +588,7 @@
               "type": "bug",
               "priority": 0,
               "epic": "auth-rework",
+              "labels": [],
               "title": "Urgent bug",
               "description": "",
               "acceptance_criteria": "",
@@ -583,6 +605,7 @@
               "type": "task",
               "priority": 1,
               "epic": "auth-rework",
+              "labels": [],
               "title": "Waits on bug",
               "description": "",
               "acceptance_criteria": "",
@@ -601,6 +624,7 @@
               "type": "chore",
               "priority": 2,
               "epic": "auth-rework",
+              "labels": [],
               "title": "Chore",
               "description": "",
               "acceptance_criteria": "",
@@ -627,6 +651,7 @@
               "type": "task",
               "priority": 1,
               "epic": "auth-rework",
+              "labels": [],
               "title": "Waits on bug",
               "description": "",
               "acceptance_criteria": "",
@@ -693,6 +718,7 @@
         "type": "task",
         "priority": 2,
         "epic": "gone",
+        "labels": [],
         "title": "Orphan",
         "description": "",
         "acceptance_criteria": "",
@@ -754,6 +780,7 @@
         "type": "feature",
         "priority": 2,
         "epic": null,
+        "labels": [],
         "title": "Typed",
         "description": "",
         "acceptance_criteria": "",
@@ -783,6 +810,7 @@
         "type": "task",
         "priority": 5,
         "epic": null,
+        "labels": [],
         "title": "Prio",
         "description": "",
         "acceptance_criteria": "",
@@ -792,6 +820,451 @@
         "notes": [],
         "created_at": "2026-11-14T00:00:00Z",
         "updated_at": "2026-11-14T00:00:00Z",
+        "revision": 1
+      }
+    ],
+    "commands": [
+      {
+        "args": [
+          "--validate"
+        ],
+        "code": 1
+      }
+    ]
+  },
+  {
+    "name": "labels",
+    "issues": [
+      {
+        "id": "bc-00000000000040008000000000000021",
+        "type": "task",
+        "priority": 1,
+        "epic": null,
+        "labels": [
+          "backend",
+          "security"
+        ],
+        "title": "Harden login",
+        "description": "",
+        "acceptance_criteria": "",
+        "state": "open",
+        "depends_on": [],
+        "claim": null,
+        "notes": [],
+        "created_at": "2026-11-15T00:00:00Z",
+        "updated_at": "2026-11-15T00:00:00Z",
+        "revision": 1
+      },
+      {
+        "id": "bc-00000000000040008000000000000022",
+        "type": "task",
+        "priority": 2,
+        "epic": null,
+        "labels": [
+          "backend"
+        ],
+        "title": "Cache responses",
+        "description": "",
+        "acceptance_criteria": "",
+        "state": "open",
+        "depends_on": [],
+        "claim": null,
+        "notes": [],
+        "created_at": "2026-11-15T00:00:00Z",
+        "updated_at": "2026-11-15T00:00:00Z",
+        "revision": 1
+      },
+      {
+        "id": "bc-00000000000040008000000000000023",
+        "type": "task",
+        "priority": 2,
+        "epic": null,
+        "labels": [
+          "security"
+        ],
+        "title": "Rotate keys",
+        "description": "",
+        "acceptance_criteria": "",
+        "state": "closed",
+        "depends_on": [],
+        "claim": null,
+        "notes": [],
+        "created_at": "2026-11-15T00:00:00Z",
+        "updated_at": "2026-11-15T00:00:00Z",
+        "revision": 1
+      }
+    ],
+    "commands": [
+      {
+        "args": [
+          "--list",
+          "--label",
+          "backend"
+        ],
+        "code": 0,
+        "result": [
+          {
+            "id": "bc-00000000000040008000000000000021",
+            "type": "task",
+            "priority": 1,
+            "epic": null,
+            "labels": [
+              "backend",
+              "security"
+            ],
+            "title": "Harden login",
+            "description": "",
+            "acceptance_criteria": "",
+            "state": "open",
+            "depends_on": [],
+            "claim": null,
+            "notes": [],
+            "created_at": "2026-11-15T00:00:00Z",
+            "updated_at": "2026-11-15T00:00:00Z",
+            "revision": 1
+          },
+          {
+            "id": "bc-00000000000040008000000000000022",
+            "type": "task",
+            "priority": 2,
+            "epic": null,
+            "labels": [
+              "backend"
+            ],
+            "title": "Cache responses",
+            "description": "",
+            "acceptance_criteria": "",
+            "state": "open",
+            "depends_on": [],
+            "claim": null,
+            "notes": [],
+            "created_at": "2026-11-15T00:00:00Z",
+            "updated_at": "2026-11-15T00:00:00Z",
+            "revision": 1
+          }
+        ]
+      },
+      {
+        "args": [
+          "--list",
+          "--label",
+          "backend",
+          "--label",
+          "security"
+        ],
+        "code": 0,
+        "result": [
+          {
+            "id": "bc-00000000000040008000000000000021",
+            "type": "task",
+            "priority": 1,
+            "epic": null,
+            "labels": [
+              "backend",
+              "security"
+            ],
+            "title": "Harden login",
+            "description": "",
+            "acceptance_criteria": "",
+            "state": "open",
+            "depends_on": [],
+            "claim": null,
+            "notes": [],
+            "created_at": "2026-11-15T00:00:00Z",
+            "updated_at": "2026-11-15T00:00:00Z",
+            "revision": 1
+          }
+        ]
+      },
+      {
+        "args": [
+          "--list",
+          "--label",
+          "security",
+          "--state",
+          "closed"
+        ],
+        "code": 0,
+        "result": [
+          {
+            "id": "bc-00000000000040008000000000000023",
+            "type": "task",
+            "priority": 2,
+            "epic": null,
+            "labels": [
+              "security"
+            ],
+            "title": "Rotate keys",
+            "description": "",
+            "acceptance_criteria": "",
+            "state": "closed",
+            "depends_on": [],
+            "claim": null,
+            "notes": [],
+            "created_at": "2026-11-15T00:00:00Z",
+            "updated_at": "2026-11-15T00:00:00Z",
+            "revision": 1
+          }
+        ]
+      },
+      {
+        "args": [
+          "--ready",
+          "--label",
+          "security"
+        ],
+        "code": 0,
+        "result": [
+          {
+            "id": "bc-00000000000040008000000000000021",
+            "type": "task",
+            "priority": 1,
+            "epic": null,
+            "labels": [
+              "backend",
+              "security"
+            ],
+            "title": "Harden login",
+            "description": "",
+            "acceptance_criteria": "",
+            "state": "open",
+            "depends_on": [],
+            "claim": null,
+            "notes": [],
+            "created_at": "2026-11-15T00:00:00Z",
+            "updated_at": "2026-11-15T00:00:00Z",
+            "revision": 1
+          }
+        ]
+      },
+      {
+        "args": [
+          "--ready",
+          "--label",
+          "frontend"
+        ],
+        "code": 0,
+        "result": []
+      },
+      {
+        "args": [
+          "--validate"
+        ],
+        "code": 0,
+        "result": {
+          "valid": true,
+          "issue_count": 3,
+          "epic_count": 0
+        }
+      },
+      {
+        "args": [
+          "--list",
+          "--label",
+          "Backend"
+        ],
+        "code": 2
+      },
+      {
+        "args": [
+          "--list",
+          "--label",
+          "backend",
+          "--label",
+          "backend"
+        ],
+        "code": 2
+      },
+      {
+        "args": [
+          "--blocked",
+          "--label",
+          "backend"
+        ],
+        "code": 2
+      }
+    ]
+  },
+  {
+    "name": "unsorted-labels",
+    "issues": [
+      {
+        "id": "bc-00000000000040008000000000000024",
+        "type": "task",
+        "priority": 2,
+        "epic": null,
+        "labels": [
+          "b",
+          "a"
+        ],
+        "title": "Issue 24",
+        "description": "",
+        "acceptance_criteria": "",
+        "state": "open",
+        "depends_on": [],
+        "claim": null,
+        "notes": [],
+        "created_at": "2026-11-15T00:00:00Z",
+        "updated_at": "2026-11-15T00:00:00Z",
+        "revision": 1
+      }
+    ],
+    "commands": [
+      {
+        "args": [
+          "--validate"
+        ],
+        "code": 1
+      }
+    ]
+  },
+  {
+    "name": "duplicate-labels",
+    "issues": [
+      {
+        "id": "bc-00000000000040008000000000000024",
+        "type": "task",
+        "priority": 2,
+        "epic": null,
+        "labels": [
+          "a",
+          "a"
+        ],
+        "title": "Issue 24",
+        "description": "",
+        "acceptance_criteria": "",
+        "state": "open",
+        "depends_on": [],
+        "claim": null,
+        "notes": [],
+        "created_at": "2026-11-15T00:00:00Z",
+        "updated_at": "2026-11-15T00:00:00Z",
+        "revision": 1
+      }
+    ],
+    "commands": [
+      {
+        "args": [
+          "--validate"
+        ],
+        "code": 1
+      }
+    ]
+  },
+  {
+    "name": "invalid-label",
+    "issues": [
+      {
+        "id": "bc-00000000000040008000000000000024",
+        "type": "task",
+        "priority": 2,
+        "epic": null,
+        "labels": [
+          "Bad"
+        ],
+        "title": "Issue 24",
+        "description": "",
+        "acceptance_criteria": "",
+        "state": "open",
+        "depends_on": [],
+        "claim": null,
+        "notes": [],
+        "created_at": "2026-11-15T00:00:00Z",
+        "updated_at": "2026-11-15T00:00:00Z",
+        "revision": 1
+      }
+    ],
+    "commands": [
+      {
+        "args": [
+          "--validate"
+        ],
+        "code": 1
+      }
+    ]
+  },
+  {
+    "name": "too-many-labels",
+    "issues": [
+      {
+        "id": "bc-00000000000040008000000000000024",
+        "type": "task",
+        "priority": 2,
+        "epic": null,
+        "labels": [
+          "l00",
+          "l01",
+          "l02",
+          "l03",
+          "l04",
+          "l05",
+          "l06",
+          "l07",
+          "l08",
+          "l09",
+          "l10",
+          "l11",
+          "l12",
+          "l13",
+          "l14",
+          "l15",
+          "l16",
+          "l17",
+          "l18",
+          "l19",
+          "l20",
+          "l21",
+          "l22",
+          "l23",
+          "l24",
+          "l25",
+          "l26",
+          "l27",
+          "l28",
+          "l29",
+          "l30",
+          "l31",
+          "l32"
+        ],
+        "title": "Issue 24",
+        "description": "",
+        "acceptance_criteria": "",
+        "state": "open",
+        "depends_on": [],
+        "claim": null,
+        "notes": [],
+        "created_at": "2026-11-15T00:00:00Z",
+        "updated_at": "2026-11-15T00:00:00Z",
+        "revision": 1
+      }
+    ],
+    "commands": [
+      {
+        "args": [
+          "--validate"
+        ],
+        "code": 1
+      }
+    ]
+  },
+  {
+    "name": "labels-not-array",
+    "issues": [
+      {
+        "id": "bc-00000000000040008000000000000024",
+        "type": "task",
+        "priority": 2,
+        "epic": null,
+        "labels": "a",
+        "title": "Issue 24",
+        "description": "",
+        "acceptance_criteria": "",
+        "state": "open",
+        "depends_on": [],
+        "claim": null,
+        "notes": [],
+        "created_at": "2026-11-15T00:00:00Z",
+        "updated_at": "2026-11-15T00:00:00Z",
         "revision": 1
       }
     ],
