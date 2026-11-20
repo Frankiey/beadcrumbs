@@ -85,7 +85,7 @@ flowchart LR
     R --> PR["Open a PR"]
 ```
 
-`main` is protected: every change, including the maintainer's, lands through a pull request. A review from the maintainer is requested automatically through [CODEOWNERS](.github/CODEOWNERS), and one approval with all conversations resolved is required before merging.
+`main` is protected: every change, including the maintainer's, lands through a pull request. A review from the maintainer is requested automatically through [CODEOWNERS](.github/CODEOWNERS), and one approval with all conversations resolved is required before merging. The "CI passed" check must also be green.
 
 ### Protocol-affecting changes
 
@@ -114,6 +114,7 @@ Before opening a pull request:
 - [ ] Specs and examples are updated when behavior changes.
 - [ ] `beadcrumbs.py` still imports only standard-library modules.
 - [ ] If ports are affected, `make matrix` passes or the PR says which clients still need updating.
+- [ ] [CHANGELOG.md](CHANGELOG.md) has an entry under Unreleased for user-visible changes.
 - [ ] [PROGRESS.md](PROGRESS.md) records what was done and how it was verified.
 
 ## Proposing a feature

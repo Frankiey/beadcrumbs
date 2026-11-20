@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/Frankiey/beadcrumbs/security/advisories/new
+    about: Report vulnerabilities privately, not in a public issue.
+  - name: Read the FAQ
+    url: https://github.com/Frankiey/beadcrumbs/blob/main/docs/faq.md
+    about: Answers to common questions about claims, locks, and recovery.
