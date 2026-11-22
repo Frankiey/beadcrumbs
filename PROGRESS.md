@@ -73,7 +73,7 @@ Verification: all relative links and heading anchors resolve; all 16 Mermaid blo
 
 Prepared for publication at https://github.com/Frankiey/beadcrumbs on 17 November 2026. The research doc's links to a local Beads checkout now point at upstream gastownhall/beads pinned to commit d76ade2. The review was performed on a fork commit, 53cc7d8, whose 19 additional commits change none of the 21 cited files, so the upstream links show identical content. The clone URL and copyright holder are filled in. SECURITY.md defines private reporting through GitHub advisories and the in-scope and out-of-scope boundary from docs/security.md; GitHub private vulnerability reporting must be enabled in the repository settings after the first push. The README comparison table now links upstream gastownhall/beads, and every Beads cell was checked against the reviewed checkout. Relative links and anchors resolve and the unittest suite passes.
 
-Still open before announcing: CI across Linux, macOS, and Windows; minimum-toolchain verification; community templates; a CHANGELOG and v0.1.0 tag; repository metadata.
+Still open before announcing: CI across Linux, macOS, and Windows; minimum-toolchain verification; community templates; a CHANGELOG and v0.1.0 tag; repository metadata. On 20 November 2026 the CHANGELOG, issue and PR templates, repository topics, and a required "CI passed" status check on the `main` rule set were added; the v0.1.0 tag follows the merge of that change.
 
 ## CI and local tooling
 

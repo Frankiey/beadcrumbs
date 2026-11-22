@@ -1,0 +1,50 @@
+name: Bug report
+description: Something behaves differently from the docs or specs.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. For security issues, use [private vulnerability reporting](https://github.com/Frankiey/beadcrumbs/security/advisories/new) instead of a public issue.
+  - type: dropdown
+    id: client
+    attributes:
+      label: Client
+      options:
+        - Python (beadcrumbs.py)
+        - TypeScript / npm
+        - Go
+        - Rust
+        - .NET
+        - Several or all
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Client version and platform
+      description: Output of `--version`, plus OS and filesystem.
+      placeholder: beadcrumbs 0.1.0, macOS 27, APFS
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Exact commands, ideally starting from `--init` in an empty directory.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected and actual behavior
+      description: Include the exit code and any stderr output. Remove claim tokens you don't want to share.
+    validations:
+      required: true
+  - type: textarea
+    id: store
+    attributes:
+      label: Store contents (optional)
+      description: Relevant files from `.beadcrumbs/`, if the issue involves a specific record.
+      render: json

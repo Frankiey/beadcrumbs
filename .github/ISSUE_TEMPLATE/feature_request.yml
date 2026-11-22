@@ -1,0 +1,29 @@
+name: Feature request
+description: Propose a new command, field, or behavior.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Check [docs/features.md](https://github.com/Frankiey/beadcrumbs/blob/main/docs/features.md) first; it lists proposals already planned or deferred. Beadcrumbs stays small on purpose, so a concrete use case helps most.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What are you or your agents trying to do, and what gets in the way today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Commands, flags, output, or record fields you have in mind.
+    validations:
+      required: true
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope
+      options:
+        - label: This would change the on-disk store format.
+        - label: This would change the CLI JSON output or exit codes.
